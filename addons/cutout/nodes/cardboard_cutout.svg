@@ -1,0 +1,14 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="64" height="64" fill="none"/>
+
+  <!-- Cardboard cutout shape - front face -->
+  <path d="M 16 20 L 32 12 L 48 20 L 45 45 L 35 50 L 19 45 Z" fill="#8B7355" stroke="#654321" stroke-width="2"/>
+
+  <!-- Side depth indication -->
+  <path d="M 32 12 L 35 14 L 35 50 L 32 48 Z" fill="#6B5345"/>
+  <path d="M 48 20 L 50 22 L 45 48 L 45 45 Z" fill="#A0826D"/>
+
+  <!-- Alpha cutout indication (notch) -->
+  <circle cx="32" cy="30" r="6" fill="none" stroke="#FFD700" stroke-width="1.5" opacity="0.8"/>
+</svg>
