@@ -18,14 +18,16 @@ const LOOKUP_BITS: PackedInt32Array = [
 	0xFF13, 0xFF12, 0xFF32, 0xFFFF
 ]
 
-func _calculate_boundary(image: Image) -> PackedVector2Array:
-	# 1. Create a BitMap from the image. 
-	# This handles all the transparency thresholding in C++.
+func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
+	# 1. Prepare image for BitMap (must be LA8 and uncompressed)
+	var converted_image := image.duplicate()
+	if converted_image.is_compressed():
+		converted_image.decompress()
+	converted_image.convert(Image.FORMAT_LA8)
 	var bitmap := BitMap.new()
-	bitmap.create_from_image_alpha(image, alpha_threshold)
-	
-	# 2. Delegate to the core algorithm
-	return _marching_squares(bitmap)
+	bitmap.create_from_image_alpha(converted_image, alpha_threshold)
+
+	return [_marching_squares(bitmap)]
 
 static func _marching_squares(bitmap: BitMap) -> PackedVector2Array:
 	var size := bitmap.get_size()

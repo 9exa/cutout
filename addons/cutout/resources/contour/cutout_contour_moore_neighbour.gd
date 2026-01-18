@@ -1,3 +1,4 @@
+@tool
 class_name CutoutContourMooreNeighbour
 extends CutoutContourAlgorithm
 ## Algorithms for producing CutoutContourData fromtextures.
@@ -95,8 +96,18 @@ static func _extract_contour(bitmap: BitMap) -> PackedVector2Array:
 
 
 ## Virtual. Concrete implementation of calculate_boundary
-func _calculate_boundary(image: Image) -> PackedVector2Array:
+func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
+	# Prepare image for BitMap (must be LA8 and uncompressed)
+	var converted_image := image.duplicate()
+
+	# Decompress if needed
+	if converted_image.is_compressed():
+		converted_image.decompress()
+
+	# Convert to LA8 format (required by BitMap.create_from_image_alpha)
+	converted_image.convert(Image.FORMAT_LA8)
+
 	var bitmap = BitMap.new()
-	bitmap.create_from_image_alpha(image, alpha_threshold)
+	bitmap.create_from_image_alpha(converted_image, alpha_threshold)
 
 	return [_extract_contour(bitmap)]
