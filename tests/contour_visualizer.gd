@@ -58,11 +58,19 @@ class_name ContourVisualizer
 		point_color = value
 		queue_redraw()
 
+@export_group("Point List")
+@export var show_point_list: bool = true:
+	set(value):
+		show_point_list = value
+		_update_point_list()
+
 # Cached contour data
 var _contour_points: Array[PackedVector2Array] = []
+var _points_label: Label
 
 
 func _ready() -> void:
+	_points_label = $ScrollContainer/PointsLabel
 	_recalculate_contour()
 
 
@@ -70,17 +78,47 @@ func _recalculate_contour() -> void:
 	_contour_points.clear()
 
 	if texture == null or algorithm == null:
+		_update_point_list()
 		return
 
 	# Get the image from the texture
 	var image = texture.get_image()
 	if image == null:
+		_update_point_list()
 		return
 
 	# Calculate the boundary using the algorithm
 	_contour_points = algorithm.calculate_boundary(image)
 
+	_update_point_list()
 	queue_redraw()
+
+
+func _update_point_list() -> void:
+	if not is_node_ready():
+		return
+
+	if not show_point_list or _contour_points.is_empty():
+		_points_label.text = "No contour data"
+		return
+
+	var text := ""
+	for polygon_idx in range(_contour_points.size()):
+		var contour = _contour_points[polygon_idx]
+
+		if polygon_idx > 0:
+			text += "\n------- Polygon %d -------\n" % polygon_idx
+
+		if contour.is_empty():
+			text += "[Empty polygon]\n"
+			continue
+
+		text += "[Polygon %d - %d points]\n" % [polygon_idx, contour.size()]
+		for i in range(contour.size()):
+			var point = contour[i]
+			text += "  [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
+
+	_points_label.text = text
 
 
 func _on_algorithm_changed() -> void:
