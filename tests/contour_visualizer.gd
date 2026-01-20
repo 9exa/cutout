@@ -59,18 +59,16 @@ class_name ContourVisualizer
 		queue_redraw()
 
 @export_group("Point List")
-@export var show_point_list: bool = true:
+@export var contour_points_label: Label:
 	set(value):
-		show_point_list = value
+		contour_points_label = value
 		_update_point_list()
 
 # Cached contour data
 var _contour_points: Array[PackedVector2Array] = []
-var _points_label: Label
 
 
 func _ready() -> void:
-	_points_label = $ScrollContainer/PointsLabel
 	_recalculate_contour()
 
 
@@ -98,8 +96,11 @@ func _update_point_list() -> void:
 	if not is_node_ready():
 		return
 
-	if not show_point_list or _contour_points.is_empty():
-		_points_label.text = "No contour data"
+	if not contour_points_label:
+		return
+
+	if _contour_points.is_empty():
+		contour_points_label.text = "[Contour - No data]"
 		return
 
 	var text := ""
@@ -107,10 +108,10 @@ func _update_point_list() -> void:
 		var contour = _contour_points[polygon_idx]
 
 		if polygon_idx > 0:
-			text += "\n------- Polygon %d -------\n" % polygon_idx
+			text += "\n"
 
 		if contour.is_empty():
-			text += "[Empty polygon]\n"
+			text += "[Polygon %d - Empty]\n" % polygon_idx
 			continue
 
 		text += "[Polygon %d - %d points]\n" % [polygon_idx, contour.size()]
@@ -118,7 +119,7 @@ func _update_point_list() -> void:
 			var point = contour[i]
 			text += "  [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
 
-	_points_label.text = text
+	contour_points_label.text = text
 
 
 func _on_algorithm_changed() -> void:

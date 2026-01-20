@@ -26,16 +26,16 @@ class_name ImagePolygonVisualizer
 		_recalculate_pipeline()
 		queue_redraw()
 
-## The polygon simplification algorithm to use
-@export var polysimp_algorithm: CutoutPolysimpAlgorithm:
+## The pre-smoothing polygon simplification algorithm to use
+@export var pre_smooth_simp_algorithm: CutoutPolysimpAlgorithm:
 	set(value):
-		if polysimp_algorithm != null and polysimp_algorithm.changed.is_connected(_on_polysimp_algorithm_changed):
-			polysimp_algorithm.changed.disconnect(_on_polysimp_algorithm_changed)
+		if pre_smooth_simp_algorithm != null and pre_smooth_simp_algorithm.changed.is_connected(_on_pre_smooth_simp_algorithm_changed):
+			pre_smooth_simp_algorithm.changed.disconnect(_on_pre_smooth_simp_algorithm_changed)
 
-		polysimp_algorithm = value
+		pre_smooth_simp_algorithm = value
 
-		if polysimp_algorithm != null:
-			polysimp_algorithm.changed.connect(_on_polysimp_algorithm_changed)
+		if pre_smooth_simp_algorithm != null:
+			pre_smooth_simp_algorithm.changed.connect(_on_pre_smooth_simp_algorithm_changed)
 
 		_recalculate_pipeline()
 		queue_redraw()
@@ -50,6 +50,20 @@ class_name ImagePolygonVisualizer
 
 		if smooth_algorithm != null:
 			smooth_algorithm.changed.connect(_on_smooth_algorithm_changed)
+
+		_recalculate_pipeline()
+		queue_redraw()
+
+## The post-smoothing polygon simplification algorithm to use (optional)
+@export var post_smooth_simp_algorithm: CutoutPolysimpAlgorithm:
+	set(value):
+		if post_smooth_simp_algorithm != null and post_smooth_simp_algorithm.changed.is_connected(_on_post_smooth_simp_algorithm_changed):
+			post_smooth_simp_algorithm.changed.disconnect(_on_post_smooth_simp_algorithm_changed)
+
+		post_smooth_simp_algorithm = value
+
+		if post_smooth_simp_algorithm != null:
+			post_smooth_simp_algorithm.changed.connect(_on_post_smooth_simp_algorithm_changed)
 
 		_recalculate_pipeline()
 		queue_redraw()
@@ -93,36 +107,36 @@ class_name ImagePolygonVisualizer
 		contour_point_color = value
 		queue_redraw()
 
-## Visual settings - Simplified
-@export_group("Visualization - Simplified")
-@export var show_simplified: bool = true:
+## Visual settings - Pre-Smoothed
+@export_group("Visualization - Pre-Smoothed")
+@export var show_pre_smoothed: bool = true:
 	set(value):
-		show_simplified = value
+		show_pre_smoothed = value
 		queue_redraw()
 
-@export var simplified_color: Color = Color.RED:
+@export var pre_smoothed_color: Color = Color.RED:
 	set(value):
-		simplified_color = value
+		pre_smoothed_color = value
 		queue_redraw()
 
-@export var simplified_width: float = 3.0:
+@export var pre_smoothed_width: float = 3.0:
 	set(value):
-		simplified_width = value
+		pre_smoothed_width = value
 		queue_redraw()
 
-@export var show_simplified_points: bool = true:
+@export var show_pre_smoothed_points: bool = true:
 	set(value):
-		show_simplified_points = value
+		show_pre_smoothed_points = value
 		queue_redraw()
 
-@export var simplified_point_radius: float = 4.0:
+@export var pre_smoothed_point_radius: float = 4.0:
 	set(value):
-		simplified_point_radius = value
+		pre_smoothed_point_radius = value
 		queue_redraw()
 
-@export var simplified_point_color: Color = Color.WHITE:
+@export var pre_smoothed_point_color: Color = Color.WHITE:
 	set(value):
-		simplified_point_color = value
+		pre_smoothed_point_color = value
 		queue_redraw()
 
 ## Visual settings - Smoothed
@@ -157,28 +171,75 @@ class_name ImagePolygonVisualizer
 		smoothed_point_color = value
 		queue_redraw()
 
-@export_group("Point List")
-@export var show_point_list: bool = true:
+## Visual settings - Post-Smoothed
+@export_group("Visualization - Post-Smoothed")
+@export var show_post_smoothed: bool = true:
 	set(value):
-		show_point_list = value
+		show_post_smoothed = value
+		queue_redraw()
+
+@export var post_smoothed_color: Color = Color.MAGENTA:
+	set(value):
+		post_smoothed_color = value
+		queue_redraw()
+
+@export var post_smoothed_width: float = 3.5:
+	set(value):
+		post_smoothed_width = value
+		queue_redraw()
+
+@export var show_post_smoothed_points: bool = true:
+	set(value):
+		show_post_smoothed_points = value
+		queue_redraw()
+
+@export var post_smoothed_point_radius: float = 5.0:
+	set(value):
+		post_smoothed_point_radius = value
+		queue_redraw()
+
+@export var post_smoothed_point_color: Color = Color.YELLOW:
+	set(value):
+		post_smoothed_point_color = value
+		queue_redraw()
+
+@export_group("Point List Labels")
+@export var contour_points_label: Label:
+	set(value):
+		contour_points_label = value
+		_update_point_list()
+
+@export var pre_smoothed_points_label: Label:
+	set(value):
+		pre_smoothed_points_label = value
+		_update_point_list()
+
+@export var smoothed_points_label: Label:
+	set(value):
+		smoothed_points_label = value
+		_update_point_list()
+
+@export var post_smoothed_points_label: Label:
+	set(value):
+		post_smoothed_points_label = value
 		_update_point_list()
 
 # Cached pipeline data
 var _contour_polygons: Array[PackedVector2Array] = []
-var _simplified_polygons: Array[PackedVector2Array] = []
+var _pre_smoothed_polygons: Array[PackedVector2Array] = []
 var _smoothed_polygons: Array[PackedVector2Array] = []
-var _points_label: Label
+var _post_smoothed_polygons: Array[PackedVector2Array] = []
 
 
 func _ready() -> void:
-	_points_label = $ScrollContainer/PointsLabel
 	_recalculate_pipeline()
 
 
 func _recalculate_pipeline() -> void:
 	_contour_polygons.clear()
-	_simplified_polygons.clear()
+	_pre_smoothed_polygons.clear()
 	_smoothed_polygons.clear()
+	_post_smoothed_polygons.clear()
 
 	if texture == null or contour_algorithm == null:
 		_update_point_list()
@@ -194,26 +255,37 @@ func _recalculate_pipeline() -> void:
 	_contour_polygons = contour_algorithm.calculate_boundary(image)
 
 	# Step 2: Simplify each contour polygon (if simplification algorithm is set)
-	if polysimp_algorithm != null:
+	if pre_smooth_simp_algorithm != null:
 		for contour in _contour_polygons:
 			if contour.is_empty():
-				_simplified_polygons.append(PackedVector2Array())
+				_pre_smoothed_polygons.append(PackedVector2Array())
 			else:
-				_simplified_polygons.append(polysimp_algorithm.simplify(contour))
+				_pre_smoothed_polygons.append(pre_smooth_simp_algorithm.simplify(contour))
 	else:
 		# If no simplification algorithm, use contours as-is
-		_simplified_polygons = _contour_polygons.duplicate()
+		_pre_smoothed_polygons = _contour_polygons.duplicate()
 
 	# Step 3: Smooth each polygon (if smoothing algorithm is set)
 	if smooth_algorithm != null:
-		for simplified in _simplified_polygons:
-			if simplified.is_empty():
+		for pre_smoothed in _pre_smoothed_polygons:
+			if pre_smoothed.is_empty():
 				_smoothed_polygons.append(PackedVector2Array())
 			else:
-				_smoothed_polygons.append(smooth_algorithm.smooth(simplified))
+				_smoothed_polygons.append(smooth_algorithm.smooth(pre_smoothed))
 	else:
-		# If no smoothing algorithm, use simplified as-is
-		_smoothed_polygons = _simplified_polygons.duplicate()
+		# If no smoothing algorithm, use pre-smoothed as-is
+		_smoothed_polygons = _pre_smoothed_polygons.duplicate()
+
+	# Step 4: Post-smooth simplification (if algorithm is set)
+	if post_smooth_simp_algorithm != null:
+		for smoothed in _smoothed_polygons:
+			if smoothed.is_empty():
+				_post_smoothed_polygons.append(PackedVector2Array())
+			else:
+				_post_smoothed_polygons.append(post_smooth_simp_algorithm.simplify(smoothed))
+	else:
+		# If no post-smooth simplification algorithm, use smoothed as-is
+		_post_smoothed_polygons = _smoothed_polygons.duplicate()
 
 	_update_point_list()
 	queue_redraw()
@@ -223,64 +295,69 @@ func _update_point_list() -> void:
 	if not is_node_ready():
 		return
 
-	if not show_point_list or _contour_polygons.is_empty():
-		_points_label.text = "No pipeline data"
-		return
-
-	var text := ""
-
-	for polygon_idx in range(_contour_polygons.size()):
-		var contour = _contour_polygons[polygon_idx]
-		var simplified = _simplified_polygons[polygon_idx] if polygon_idx < _simplified_polygons.size() else PackedVector2Array()
-		var smoothed = _smoothed_polygons[polygon_idx] if polygon_idx < _smoothed_polygons.size() else PackedVector2Array()
-
-		if polygon_idx > 0:
-			text += "\n========================================\n"
-
-		text += "[Polygon %d]\n" % polygon_idx
-
-		# Original contour info
-		if contour.is_empty():
-			text += "  [Contour - Empty]\n"
+	# Update contour points label
+	if contour_points_label:
+		var contour_text := ""
+		if _contour_polygons.is_empty():
+			contour_text = "[Contour - No data]"
 		else:
-			text += "  [Contour - %d points]\n" % contour.size()
-			for i in range(min(contour.size(), 5)):  # Show first 5 points
-				var point = contour[i]
-				text += "    [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
-			if contour.size() > 5:
-				text += "    ... (%d more points)\n" % (contour.size() - 5)
+			for polygon_idx in range(_contour_polygons.size()):
+				var contour = _contour_polygons[polygon_idx]
+				if polygon_idx > 0:
+					contour_text += "\n"
+				contour_text += "[Polygon %d - %d points]\n" % [polygon_idx, contour.size()]
+				for i in range(contour.size()):
+					var point = contour[i]
+					contour_text += "  [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
+		contour_points_label.text = contour_text
 
-		# Simplified polygon info
-		if simplified.is_empty():
-			text += "  [Simplified - Empty]\n"
+	# Update pre-smoothed points label
+	if pre_smoothed_points_label:
+		var pre_smoothed_text := ""
+		if _pre_smoothed_polygons.is_empty():
+			pre_smoothed_text = "[Pre-Smoothed - No data]"
 		else:
-			text += "  [Simplified - %d points]\n" % simplified.size()
-			for i in range(min(simplified.size(), 5)):  # Show first 5 points
-				var point = simplified[i]
-				text += "    [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
-			if simplified.size() > 5:
-				text += "    ... (%d more points)\n" % (simplified.size() - 5)
+			for polygon_idx in range(_pre_smoothed_polygons.size()):
+				var pre_smoothed = _pre_smoothed_polygons[polygon_idx]
+				if polygon_idx > 0:
+					pre_smoothed_text += "\n"
+				pre_smoothed_text += "[Polygon %d - %d points]\n" % [polygon_idx, pre_smoothed.size()]
+				for i in range(pre_smoothed.size()):
+					var point = pre_smoothed[i]
+					pre_smoothed_text += "  [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
+		pre_smoothed_points_label.text = pre_smoothed_text
 
-		# Smoothed polygon info
-		if smooth_algorithm and not smoothed.is_empty():
-			text += "  [Smoothed - %d points]\n" % smoothed.size()
-			for i in range(min(smoothed.size(), 5)):  # Show first 5 points
-				var point = smoothed[i]
-				text += "    [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
-			if smoothed.size() > 5:
-				text += "    ... (%d more points)\n" % (smoothed.size() - 5)
+	# Update smoothed points label
+	if smoothed_points_label:
+		var smoothed_text := ""
+		if _smoothed_polygons.is_empty() or smooth_algorithm == null:
+			smoothed_text = "[Smoothed - No data]"
+		else:
+			for polygon_idx in range(_smoothed_polygons.size()):
+				var smoothed = _smoothed_polygons[polygon_idx]
+				if polygon_idx > 0:
+					smoothed_text += "\n"
+				smoothed_text += "[Polygon %d - %d points]\n" % [polygon_idx, smoothed.size()]
+				for i in range(smoothed.size()):
+					var point = smoothed[i]
+					smoothed_text += "  [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
+		smoothed_points_label.text = smoothed_text
 
-		# Reduction stats
-		if not contour.is_empty() and not simplified.is_empty():
-			var reduction = (1.0 - float(simplified.size()) / float(contour.size())) * 100.0
-			text += "  Simplification: %.1f%% (%d → %d points)\n" % [reduction, contour.size(), simplified.size()]
-
-		if smooth_algorithm and not simplified.is_empty() and not smoothed.is_empty():
-			var smooth_change = (float(smoothed.size()) - float(simplified.size())) / float(simplified.size()) * 100.0
-			if abs(smooth_change) > 0.1:
-				text += "  Smoothing: %+.1f%% (%d → %d points)\n" % [smooth_change, simplified.size(), smoothed.size()]
-
-	_points_label.text = text
+	# Update post-smoothed points label
+	if post_smoothed_points_label:
+		var post_smoothed_text := ""
+		if _post_smoothed_polygons.is_empty() or post_smooth_simp_algorithm == null:
+			post_smoothed_text = "[Post-Smoothed - No data]"
+		else:
+			for polygon_idx in range(_post_smoothed_polygons.size()):
+				var post_smoothed = _post_smoothed_polygons[polygon_idx]
+				if polygon_idx > 0:
+					post_smoothed_text += "\n"
+				post_smoothed_text += "[Polygon %d - %d points]\n" % [polygon_idx, post_smoothed.size()]
+				for i in range(post_smoothed.size()):
+					var point = post_smoothed[i]
+					post_smoothed_text += "  [%d]: (%.2f, %.2f)\n" % [i, point.x, point.y]
+		post_smoothed_points_label.text = post_smoothed_text
 
 
 func _on_contour_algorithm_changed() -> void:
@@ -288,12 +365,17 @@ func _on_contour_algorithm_changed() -> void:
 	queue_redraw()
 
 
-func _on_polysimp_algorithm_changed() -> void:
+func _on_pre_smooth_simp_algorithm_changed() -> void:
 	_recalculate_pipeline()
 	queue_redraw()
 
 
 func _on_smooth_algorithm_changed() -> void:
+	_recalculate_pipeline()
+	queue_redraw()
+
+
+func _on_post_smooth_simp_algorithm_changed() -> void:
 	_recalculate_pipeline()
 	queue_redraw()
 
@@ -326,22 +408,22 @@ func _draw() -> void:
 				for point in contour:
 					draw_circle(point, contour_point_radius, contour_point_color)
 
-	# Draw simplified polygons
-	if show_simplified:
-		for simplified in _simplified_polygons:
-			if simplified.is_empty():
+	# Draw pre-smoothed polygons
+	if show_pre_smoothed:
+		for pre_smoothed in _pre_smoothed_polygons:
+			if pre_smoothed.is_empty():
 				continue
 
 			# Draw lines connecting the points
-			for i in range(simplified.size()):
-				var p1 = simplified[i]
-				var p2 = simplified[(i + 1) % simplified.size()]
-				draw_line(p1, p2, simplified_color, simplified_width)
+			for i in range(pre_smoothed.size()):
+				var p1 = pre_smoothed[i]
+				var p2 = pre_smoothed[(i + 1) % pre_smoothed.size()]
+				draw_line(p1, p2, pre_smoothed_color, pre_smoothed_width)
 
-			# Draw simplified points
-			if show_simplified_points:
-				for point in simplified:
-					draw_circle(point, simplified_point_radius, simplified_point_color)
+			# Draw pre-smoothed points
+			if show_pre_smoothed_points:
+				for point in pre_smoothed:
+					draw_circle(point, pre_smoothed_point_radius, pre_smoothed_point_color)
 
 	print("_smoothed_polygons", _smoothed_polygons)
 	# Draw smoothed polygons
@@ -361,3 +443,20 @@ func _draw() -> void:
 			if show_smoothed_points:
 				for point in smoothed:
 					draw_circle(point, smoothed_point_radius, smoothed_point_color)
+
+	# Draw post-smoothed polygons
+	if show_post_smoothed and post_smooth_simp_algorithm:
+		for post_smoothed in _post_smoothed_polygons:
+			if post_smoothed.is_empty():
+				continue
+
+			# Draw lines connecting the points
+			for i in range(post_smoothed.size()):
+				var p1 = post_smoothed[i]
+				var p2 = post_smoothed[(i + 1) % post_smoothed.size()]
+				draw_line(p1, p2, post_smoothed_color, post_smoothed_width)
+
+			# Draw post-smoothed points
+			if show_post_smoothed_points:
+				for point in post_smoothed:
+					draw_circle(point, post_smoothed_point_radius, post_smoothed_point_color)
