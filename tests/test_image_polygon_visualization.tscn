@@ -1,0 +1,59 @@
+[gd_scene load_steps=7 format=3 uid="uid://qm2j8s5qvohb"]
+
+[ext_resource type="Script" uid="uid://c45skut1qqr0p" path="res://tests/image_polygon_visualizer.gd" id="1_dw8u2"]
+[ext_resource type="Texture2D" uid="uid://ddlnfenet1rw" path="res://icon.svg" id="2_dar6m"]
+[ext_resource type="Script" uid="uid://bb3ihld3akw0y" path="res://addons/cutout/resources/contour/cutout_contour_moore_neighbour.gd" id="3_gwidm"]
+[ext_resource type="Script" uid="uid://33dmc51ugjtx" path="res://addons/cutout/resources/polysimp/cutout_polysimp_rdp.gd" id="4_qr8d2"]
+
+[sub_resource type="Resource" id="Resource_38me5"]
+script = ExtResource("3_gwidm")
+metadata/_custom_type_script = "uid://bb3ihld3akw0y"
+
+[sub_resource type="Resource" id="Resource_uelcw"]
+script = ExtResource("4_qr8d2")
+epsilon = 5.1
+tolerance = 5.1
+metadata/_custom_type_script = "uid://33dmc51ugjtx"
+
+[node name="ImagePolygonVisualizer" type="Node2D"]
+script = ExtResource("1_dw8u2")
+texture = ExtResource("2_dar6m")
+contour_algorithm = SubResource("Resource_38me5")
+polysimp_algorithm = SubResource("Resource_uelcw")
+show_contour = false
+show_simplified = false
+smoothed_color = Color(0.80521685, 0.88390595, 1, 1)
+smoothed_width = 3.53
+show_smoothed_points = true
+smoothed_point_radius = 3.46
+smoothed_point_color = Color(0.051317222, 0.33045813, 0.63411844, 1)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+custom_minimum_size = Vector2(300, 600)
+offset_left = -310.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 610.0
+
+[node name="PointsLabel" type="Label" parent="ScrollContainer"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+text = "[Polygon 0]
+  [Contour - 472 points]
+    [0]: (12.00, 0.00)
+    [1]: (13.00, 0.00)
+    [2]: (14.00, 0.00)
+    [3]: (15.00, 0.00)
+    [4]: (16.00, 0.00)
+    ... (467 more points)
+  [Simplified - 9 points]
+    [0]: (12.00, 0.00)
+    [1]: (115.00, 0.00)
+    [2]: (124.00, 6.00)
+    [3]: (124.00, 121.00)
+    [4]: (115.00, 127.00)
+    ... (4 more points)
+  Simplification: 98.1% (472 → 9 points)
+"
+autowrap_mode = 1
+text_overrun_behavior = 3

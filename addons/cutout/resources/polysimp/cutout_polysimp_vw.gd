@@ -214,13 +214,13 @@ static func vw_simplify(polygon: PackedVector2Array, criteria: StoppingCriteria,
 				continue
 
 			# Find neighbors of this point
-			var prev := idx
+			var prev: int = idx
 			for _i in range(point_count):
 				prev = (prev - 1 + point_count) % point_count
 				if not points[prev].removed:
 					break
 
-			var next := idx
+			var next: int = idx
 			for _i in range(point_count):
 				next = (next + 1) % point_count
 				if not points[next].removed:

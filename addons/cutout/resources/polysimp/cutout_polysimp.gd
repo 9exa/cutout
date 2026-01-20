@@ -42,6 +42,6 @@ func simplify(polygon: PackedVector2Array) -> PackedVector2Array:
 ##
 ## @param _polygon: The input polygon to simplify
 ## @return: The simplified polygon
-@abstract
 func _simplify(_polygon: PackedVector2Array) -> PackedVector2Array:
+	push_error("_simplify() is an abstract method and must be implemented in derived classes")
 	return PackedVector2Array()

@@ -61,21 +61,21 @@ func test_marching_squares_alpha_threshold():
 	assert(result.size() > 0, "Semi-transparent pixel above threshold should create contour")
 
 func test_get_edge_pos_static():
-	# Test the static _get_edge_pos helper function
-	var top = CutoutContourMarchingSquares._get_edge_pos(0, 0, 0)
+	# Test the static _get_edge_point helper function
+	var top = CutoutContourMarchingSquares._get_edge_point(0, 0, 0)
 	assert(top == Vector2(0.5, 0), "Top edge should be at middle of top")
 
-	var right = CutoutContourMarchingSquares._get_edge_pos(0, 0, 1)
+	var right = CutoutContourMarchingSquares._get_edge_point(0, 0, 1)
 	assert(right == Vector2(1.0, 0.5), "Right edge should be at middle of right")
 
-	var bottom = CutoutContourMarchingSquares._get_edge_pos(0, 0, 2)
+	var bottom = CutoutContourMarchingSquares._get_edge_point(0, 0, 2)
 	assert(bottom == Vector2(0.5, 1.0), "Bottom edge should be at middle of bottom")
 
-	var left = CutoutContourMarchingSquares._get_edge_pos(0, 0, 3)
+	var left = CutoutContourMarchingSquares._get_edge_point(0, 0, 3)
 	assert(left == Vector2(0, 0.5), "Left edge should be at middle of left")
 
 func test_marching_squares_with_bitmap():
-	# Test the static _marching_squares function directly with a BitMap
+	# Test the static _marching_squares_all function directly with a BitMap
 	var bitmap = BitMap.new()
 	bitmap.create(Vector2i(4, 4))
 
@@ -85,8 +85,9 @@ func test_marching_squares_with_bitmap():
 	bitmap.set_bit(1, 2, true)
 	bitmap.set_bit(2, 2, true)
 
-	var result = CutoutContourMarchingSquares._marching_squares(bitmap)
-	assert(result.size() > 0, "Bitmap with solid region should generate contour")
+	var result = CutoutContourMarchingSquares._marching_squares_all(bitmap)
+	assert(result.size() > 0, "Bitmap with solid region should generate contours")
+	assert(result[0].size() > 0, "First contour should have points")
 	assert(result.size() % 2 == 0, "Result should have even number of points")
 
 func test_marching_squares_horizontal_line():

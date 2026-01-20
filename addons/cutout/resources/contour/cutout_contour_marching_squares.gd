@@ -2,152 +2,248 @@
 extends CutoutContourAlgorithm
 class_name CutoutContourMarchingSquares
 
+## Marching squares algorithm for extracting contours from images.
+## Supports multiple disconnected shapes by using a fill bitmap to track visited regions.
 
-# Edge Indices
-const EDGE_TOP    = 0x0
-const EDGE_RIGHT  = 0x1
-const EDGE_BOTTOM = 0x2
-const EDGE_LEFT   = 0x3
-const EDGE_NULL   = 0xF
+# Edge Indices for marching squares
+const EDGE_TOP    = 0
+const EDGE_RIGHT  = 1
+const EDGE_BOTTOM = 2
+const EDGE_LEFT   = 3
 
-# Each int stores two segments: (edgeA << 0 | edgeB << 4) | (edgeC << 8 | edgeD << 12)
-const LOOKUP_BITS: PackedInt32Array = [
-	0xFFFF, 0xFF32, 0xFF12, 0xFF13,
-	0xFF01, 0x3210, 0xFF02, 0xFF03,
-	0xFF03, 0xFF02, 0x2130, 0xFF01,
-	0xFF13, 0xFF12, 0xFF32, 0xFFFF
+# Marching squares lookup table
+# Each configuration maps to edge connections
+const MARCHING_SQUARES_TABLE = [
+	[],                     # 0: empty
+	[[3, 2]],              # 1: bottom-left corner
+	[[2, 1]],              # 2: bottom-right corner
+	[[3, 1]],              # 3: bottom edge
+	[[1, 0]],              # 4: top-right corner
+	[[3, 2], [1, 0]],      # 5: diagonal (saddle point)
+	[[2, 0]],              # 6: right edge
+	[[3, 0]],              # 7: top-right filled
+	[[0, 3]],              # 8: top-left corner
+	[[0, 2]],              # 9: left edge
+	[[0, 3], [2, 1]],      # 10: diagonal (saddle point)
+	[[0, 1]],              # 11: top-left filled
+	[[1, 3]],              # 12: top edge
+	[[1, 2]],              # 13: bottom-left filled
+	[[2, 3]],              # 14: top-left filled
+	[]                      # 15: full
 ]
 
+
 func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
-	# 1. Prepare image for BitMap (must be LA8 and uncompressed)
+	# Prepare image for BitMap (must be LA8 and uncompressed)
 	var converted_image := image.duplicate()
 	if converted_image.is_compressed():
 		converted_image.decompress()
 	converted_image.convert(Image.FORMAT_LA8)
+
 	var bitmap := BitMap.new()
 	bitmap.create_from_image_alpha(converted_image, alpha_threshold)
 
-	return [_marching_squares(bitmap)]
+	return _marching_squares_all(bitmap)
 
-static func _marching_squares(bitmap: BitMap) -> PackedVector2Array:
+
+## Extract all contours from bitmap using marching squares
+static func _marching_squares_all(bitmap: BitMap) -> Array[PackedVector2Array]:
 	var size := bitmap.get_size()
-	var result := PackedVector2Array()
-	var visited := {}  # Track visited cells to avoid duplicate contours
+	var contours: Array[PackedVector2Array] = []
 
-	# Find the topmost-leftmost opaque pixel as starting point
-	var start_pos := Vector2i(-1, -1)
+	# Create a fill bitmap to track visited pixels
+	var fill_bitmap := BitMap.new()
+	fill_bitmap.create(size)
+
+	# Scan for unvisited opaque edge pixels
 	for y in range(size.y):
 		for x in range(size.x):
-			if bitmap.get_bit(x, y):
-				start_pos = Vector2i(x, y)
-				break
-		if start_pos.x != -1:
-			break
-
-	if start_pos.x == -1:
-		return result
-
-	# Trace contours starting from the first opaque pixel
-	for start_y in range(size.y):
-		for start_x in range(size.x):
-			if not bitmap.get_bit(start_x, start_y):
+			# Skip if not opaque or already visited
+			if not bitmap.get_bit(x, y) or fill_bitmap.get_bit(x, y):
 				continue
 
-			# Check if we've already traced from this cell
-			var cell_key = "%d,%d" % [start_x, start_y]
-			if visited.has(cell_key):
+			# Check if this is an edge pixel
+			if not _is_edge_pixel(bitmap, x, y, size):
 				continue
 
-			# Start marching squares from this cell
-			var contour = _march_square(bitmap, start_x, start_y, size)
-			if contour.size() > 0:
-				result.append_array(contour)
-				visited[cell_key] = true
+			# Trace the contour from this edge pixel
+			var contour := _trace_contour(bitmap, x, y, size)
+			if contour.size() > 2:  # Only add valid contours
+				contours.append(contour)
 
-	return result
+			# Mark all pixels in this connected region as visited
+			_flood_fill(bitmap, fill_bitmap, x, y, size)
+
+	return contours
 
 
-# Trace a single contour using marching squares with proper path following
-static func _march_square(bitmap: BitMap, start_x: int, start_y: int, size: Vector2i) -> PackedVector2Array:
+## Check if a pixel is on the edge of an opaque region
+static func _is_edge_pixel(bitmap: BitMap, x: int, y: int, size: Vector2i) -> bool:
+	# A pixel is an edge if it's opaque and has at least one transparent neighbor
+	if not bitmap.get_bit(x, y):
+		return false
+
+	# Check 4-connected neighbors
+	if x > 0 and not bitmap.get_bit(x - 1, y):
+		return true
+	if x < size.x - 1 and not bitmap.get_bit(x + 1, y):
+		return true
+	if y > 0 and not bitmap.get_bit(x, y - 1):
+		return true
+	if y < size.y - 1 and not bitmap.get_bit(x, y + 1):
+		return true
+
+	return false
+
+
+## Trace a single contour using marching squares
+static func _trace_contour(bitmap: BitMap, start_x: int, start_y: int, size: Vector2i) -> PackedVector2Array:
 	var contour := PackedVector2Array()
-	var x := start_x
-	var y := start_y
-	var prev_dir := 0  # Direction we entered from: 0=from left, 1=from top, 2=from right, 3=from bottom
-	var max_points := size.x * size.y * 8
+	var visited_cells := {}  # Track visited marching square cells to detect completion
 
-	# Add initial point at center of starting cell
-	contour.append(Vector2(x + 0.5, y + 0.5))
+	# Start from the cell to the left and above the edge pixel
+	var x := start_x - 1
+	var y := start_y - 1
 
+	var max_steps := size.x * size.y * 4  # Safety limit
 	var steps := 0
-	while steps < max_points:
+
+	while steps < max_steps:
 		steps += 1
 
-		# Get the 4 corners of the current cell
-		var tl := bitmap.get_bit(x, y) if x >= 0 and y >= 0 else false             # Bit 3
-		var tr := bitmap.get_bit(x + 1, y) if (x + 1 < size.x and y >= 0) else false      # Bit 2
-		var br := bitmap.get_bit(x + 1, y + 1) if (x + 1 < size.x and y + 1 < size.y) else false # Bit 1
-		var bl := bitmap.get_bit(x, y + 1) if (x >= 0 and y + 1 < size.y) else false      # Bit 0
+		# Check if we've visited this cell before
+		var cell_key := "%d,%d" % [x, y]
+		if visited_cells.has(cell_key):
+			break  # Contour is complete
+		visited_cells[cell_key] = true
 
-		# Calculate cell index
-		var cell_idx := 0
-		if tl: cell_idx |= 8
-		if tr: cell_idx |= 4
-		if br: cell_idx |= 2
-		if bl: cell_idx |= 1
+		# Get the marching squares configuration for this cell
+		var config := _get_marching_square_config(bitmap, x, y, size)
 
-		# Get the edge configuration for this cell
-		var edges := LOOKUP_BITS[cell_idx]
+		# Get edges for this configuration
+		var edges: Array = MARCHING_SQUARES_TABLE[config]
+		if edges.is_empty():
+			break  # No edges to follow
 
-		# Extract the two edges from the lookup table for this entry direction
-		var e1 := (edges >> 0) & 0xF
-		var e2 := (edges >> 4) & 0xF
+		# Add edge points to contour
+		for edge_pair in edges:
+			if edge_pair.size() >= 2:
+				var p1 := _get_edge_point(x, y, edge_pair[0])
+				var p2 := _get_edge_point(x, y, edge_pair[1])
 
-		# Add the two edge midpoints
-		if e1 != 0xF:
-			contour.append(_get_edge_pos(x, y, e1))
-		if e2 != 0xF:
-			contour.append(_get_edge_pos(x, y, e2))
+				# Add points in order (we may need to handle direction)
+				if contour.is_empty():
+					contour.append(p1)
+					contour.append(p2)
+				else:
+					# Find which point connects to our last point
+					var last := contour[contour.size() - 1]
+					if last.distance_to(p1) < 0.1:
+						contour.append(p2)
+					elif last.distance_to(p2) < 0.1:
+						contour.append(p1)
+					else:
+						# Start new segment if disconnected
+						contour.append(p1)
+						contour.append(p2)
 
-		# Determine next cell to move to based on the exit edge
-		var next_x := x
-		var next_y := y
-		var next_dir := prev_dir
+		# Move to next cell based on the last edge
+		if edges.size() > 0 and edges[0].size() >= 2:
+			var exit_edge: int = edges[0][1]  # Use first edge pair's exit
+			if edges.size() > 1 and contour.size() > 1:
+				# For saddle points, choose the edge that connects
+				for edge_pair in edges:
+					if edge_pair.size() >= 2:
+						var p := _get_edge_point(x, y, edge_pair[1])
+						if contour[contour.size() - 1].distance_to(p) < 0.1:
+							exit_edge = edge_pair[1]
+							break
 
-		if e2 == EDGE_TOP:
-			next_y -= 1
-			next_dir = 1  # Entering from bottom
-		elif e2 == EDGE_RIGHT:
-			next_x += 1
-			next_dir = 0  # Entering from left
-		elif e2 == EDGE_BOTTOM:
-			next_y += 1
-			next_dir = 3  # Entering from top
-		elif e2 == EDGE_LEFT:
-			next_x -= 1
-			next_dir = 2  # Entering from right
-
-		# Check if we've returned to start
-		if next_x == start_x and next_y == start_y:
+			# Move to adjacent cell based on exit edge
+			match exit_edge:
+				EDGE_TOP:
+					y -= 1
+				EDGE_RIGHT:
+					x += 1
+				EDGE_BOTTOM:
+					y += 1
+				EDGE_LEFT:
+					x -= 1
+		else:
 			break
 
-		# Check bounds
-		if next_x < 0 or next_x >= size.x or next_y < 0 or next_y >= size.y:
-			break
-
-		x = next_x
-		y = next_y
-		prev_dir = next_dir
-
-	# Remove duplicate points
+	# Clean up duplicate points at the end
 	while contour.size() > 1 and contour[contour.size() - 1].distance_to(contour[0]) < 0.1:
 		contour.remove_at(contour.size() - 1)
 
 	return contour
 
-static func _get_edge_pos(x: int, y: int, edge: int) -> Vector2:
+
+## Get marching squares configuration for a 2x2 cell
+static func _get_marching_square_config(bitmap: BitMap, x: int, y: int, size: Vector2i) -> int:
+	var config := 0
+
+	# Check four corners of the cell (2x2 grid)
+	# Bottom-left (bit 0)
+	if _is_pixel_set(bitmap, x, y + 1, size):
+		config |= 1
+	# Bottom-right (bit 1)
+	if _is_pixel_set(bitmap, x + 1, y + 1, size):
+		config |= 2
+	# Top-right (bit 2)
+	if _is_pixel_set(bitmap, x + 1, y, size):
+		config |= 4
+	# Top-left (bit 3)
+	if _is_pixel_set(bitmap, x, y, size):
+		config |= 8
+
+	return config
+
+
+## Safely check if a pixel is set (with bounds checking)
+static func _is_pixel_set(bitmap: BitMap, x: int, y: int, size: Vector2i) -> bool:
+	if x < 0 or x >= size.x or y < 0 or y >= size.y:
+		return false
+	return bitmap.get_bit(x, y)
+
+
+## Get the position of an edge point
+static func _get_edge_point(cell_x: int, cell_y: int, edge: int) -> Vector2:
 	match edge:
-		0: return Vector2(x + 0.5, y)       # Top
-		1: return Vector2(x + 1.0, y + 0.5) # Right
-		2: return Vector2(x + 0.5, y + 1.0) # Bottom
-		3: return Vector2(x, y + 0.5)       # Left
-	return Vector2(x, y)
+		EDGE_TOP:
+			return Vector2(cell_x + 0.5, cell_y)
+		EDGE_RIGHT:
+			return Vector2(cell_x + 1.0, cell_y + 0.5)
+		EDGE_BOTTOM:
+			return Vector2(cell_x + 0.5, cell_y + 1.0)
+		EDGE_LEFT:
+			return Vector2(cell_x, cell_y + 0.5)
+		_:
+			return Vector2(cell_x + 0.5, cell_y + 0.5)
+
+
+## Flood fill to mark all connected pixels as visited
+static func _flood_fill(bitmap: BitMap, fill_bitmap: BitMap, start_x: int, start_y: int, size: Vector2i) -> void:
+	var stack := [Vector2i(start_x, start_y)]
+
+	while not stack.is_empty():
+		var pos := stack.pop_back() as Vector2i
+		var x := pos.x
+		var y := pos.y
+
+		# Skip if out of bounds or already filled
+		if x < 0 or x >= size.x or y < 0 or y >= size.y:
+			continue
+		if fill_bitmap.get_bit(x, y):
+			continue
+		if not bitmap.get_bit(x, y):
+			continue
+
+		# Mark as filled
+		fill_bitmap.set_bit(x, y, true)
+
+		# Add 4-connected neighbors to stack
+		stack.append(Vector2i(x - 1, y))
+		stack.append(Vector2i(x + 1, y))
+		stack.append(Vector2i(x, y - 1))
+		stack.append(Vector2i(x, y + 1))

@@ -31,6 +31,18 @@ enum CutoutMethod {
 		alpha_threshold = value
 		_regenerate_mesh()
 
+@export var smooth_algorithm: CutoutSmoothAlgorithm:
+	set(value):
+		if smooth_algorithm != null and smooth_algorithm.changed.is_connected(_on_smooth_algorithm_changed):
+			smooth_algorithm.changed.disconnect(_on_smooth_algorithm_changed)
+
+		smooth_algorithm = value
+
+		if smooth_algorithm != null:
+			smooth_algorithm.changed.connect(_on_smooth_algorithm_changed)
+
+		_regenerate_mesh()
+
 @export var mesh_size: Vector2 = Vector2(1.0, 1.0):
 	set(value):
 		mesh_size = value
@@ -122,6 +134,11 @@ func _regenerate_mesh() -> void:
 	# Simplify the contour
 	var simplified := ContourUtils.simplify_polygon(contour, detail_threshold)
 	print("CardboardCutout: Simplified to ", simplified.size(), " points")
+
+	# Apply smoothing if algorithm is set
+	if smooth_algorithm:
+		simplified = smooth_algorithm.smooth(simplified)
+		print("CardboardCutout: Smoothed polygon has ", simplified.size(), " points")
 
 	# Generate 3D mesh from simplified contour
 	var mesh := _generate_3d_mesh(simplified, image)
@@ -323,3 +340,7 @@ func _setup_material() -> void:
 		_mesh_instance.set_surface_override_material(1, side_material)
 
 	print("CardboardCutout: Materials set up for ", mesh.get_surface_count(), " surfaces")
+
+
+func _on_smooth_algorithm_changed() -> void:
+	_regenerate_mesh()
