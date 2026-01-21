@@ -21,7 +21,7 @@ enum CutoutMethod {
 		depth = value
 		_regenerate_mesh()
 
-@export_range(0.5, 10.0, 0.1) var detail_threshold: float = 2.0:
+@export_range(0.001, 10000.0, 0.001, "exp") var detail_threshold: float = 2.0:
 	set(value):
 		detail_threshold = value
 		_regenerate_mesh()

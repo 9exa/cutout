@@ -9,13 +9,6 @@ extends Resource
 ## a simplified version with fewer points while preserving the general shape.
 ## This is useful for reducing mesh complexity in the image-to-mesh pipeline.
 
-## Tolerance threshold for simplification algorithms.
-## Higher values result in more aggressive simplification (fewer points).
-## The exact meaning depends on the specific algorithm implementation.
-@export_range(0.0, 10.0, 0.1) var tolerance: float = 1.0:
-	set(value):
-		tolerance = value
-		emit_changed()
 
 
 ## Simplifies a polygon by reducing the number of points.

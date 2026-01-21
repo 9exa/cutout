@@ -184,7 +184,7 @@ static func clean_polygon(points: PackedVector2Array) -> PackedVector2Array:
 		return points
 
 	var cleaned := PackedVector2Array()
-	var epsilon := 0.001  # Tolerance for duplicate detection
+	var epsilon := 1.0  # Tolerance for duplicate detection (increased for larger cap)
 
 	for i in range(points.size()):
 		var p := points[i]

@@ -16,10 +16,9 @@ extends CutoutPolysimpAlgorithm
 ## Points with perpendicular distance less than epsilon from the simplified
 ## line segment will be removed. Higher values result in more aggressive
 ## simplification (fewer points).
-@export_range(0.0, 10.0, 0.1) var epsilon: float = 1.0:
+@export_range(0.001, 10000.0, 0.001, "exp") var epsilon: float = 1.0:
 	set(value):
 		epsilon = value
-		tolerance = value  # Keep base class tolerance in sync
 		emit_changed()
 
 
