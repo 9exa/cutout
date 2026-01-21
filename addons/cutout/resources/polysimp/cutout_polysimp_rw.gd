@@ -8,6 +8,8 @@ extends CutoutPolysimpAlgorithm
 ## epsilon around each line segment. Points within the corridor are removed,
 ## and points outside become new key points. It's a single-pass algorithm that
 ## processes points sequentially from a starting index.
+##
+## WINDING ORDER: Preserves the input polygon's winding order (CW or CCW).
 
 ## Distance threshold for the corridor width.
 ## Points within epsilon perpendicular distance from the current line segment

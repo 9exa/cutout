@@ -12,8 +12,18 @@ func _enter_tree() -> void:
 	)
 	print("Cutout plugin: CardboardCutout node registered")
 
+	# Register the CutoutMeshInstance3D node
+	add_custom_type(
+		"CutoutMeshInstance3D",
+		"Node3D",
+		preload("nodes/cutout_mesh_instance_3d.gd"),
+		preload("res://addons/cutout/nodes/cardboard_cutout.svg")  # Reuse same icon for now
+	)
+	print("Cutout plugin: CutoutMeshInstance3D node registered")
+
 
 func _exit_tree() -> void:
-	# Clean up the custom node type when plugin is disabled
+	# Clean up the custom node types when plugin is disabled
 	remove_custom_type("CardboardCutout")
-	print("Cutout plugin: CardboardCutout node unregistered")
+	remove_custom_type("CutoutMeshInstance3D")
+	print("Cutout plugin: CardboardCutout and CutoutMeshInstance3D nodes unregistered")

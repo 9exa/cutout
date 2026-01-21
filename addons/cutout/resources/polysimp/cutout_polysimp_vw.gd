@@ -8,6 +8,8 @@ extends CutoutPolysimpAlgorithm
 ## area with their neighbors, preserving the most visually significant points.
 ## It supports multiple stopping criteria: target proportion, target count, or
 ## minimum area threshold.
+##
+## WINDING ORDER: Preserves the input polygon's winding order (CW or CCW).
 
 ## Stopping criteria for the simplification algorithm.
 enum StoppingCriteria {

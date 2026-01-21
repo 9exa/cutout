@@ -9,6 +9,8 @@ extends CutoutPolysimpAlgorithm
 ## by finding the point with maximum perpendicular distance from the line
 ## segment between the first and last points, and recursively simplifying
 ## the resulting segments if the distance exceeds epsilon.
+##
+## WINDING ORDER: Preserves the input polygon's winding order (CW or CCW).
 
 ## Distance threshold for point removal.
 ## Points with perpendicular distance less than epsilon from the simplified

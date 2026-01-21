@@ -137,16 +137,27 @@ static func triangulate_with_fallbacks(points: PackedVector2Array) -> PackedInt3
 	if points.size() < 3:
 		return PackedInt32Array()
 
-	# Method 1: Try standard triangulation
-	var triangles := Geometry2D.triangulate_polygon(points)
+	# Method 1: Godot's triangulate_polygon expects CCW winding
+	# Our contour algorithms produce CW polygons, so we need to reverse
+	var area := compute_polygon_area(points)
+	var is_clockwise := area < 0
+
+	# Convert to CCW if needed (Godot expects CCW for solid polygons in triangulation)
+	var ccw_points := points
+	if is_clockwise:
+		ccw_points = PackedVector2Array()
+		for i in range(points.size() - 1, -1, -1):
+			ccw_points.append(points[i])
+
+	var triangles := Geometry2D.triangulate_polygon(ccw_points)
 	if not triangles.is_empty():
 		return triangles
 
-	# Method 2: Try after ensuring proper winding order (CCW)
-	var reversed := PackedVector2Array()
-	for i in range(points.size() - 1, -1, -1):
-		reversed.append(points[i])
-	triangles = Geometry2D.triangulate_polygon(reversed)
+	# Method 2: Try the opposite winding if first attempt failed
+	var opposite_points := PackedVector2Array()
+	for i in range(ccw_points.size() - 1, -1, -1):
+		opposite_points.append(ccw_points[i])
+	triangles = Geometry2D.triangulate_polygon(opposite_points)
 	if not triangles.is_empty():
 		return triangles
 

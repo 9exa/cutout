@@ -9,6 +9,9 @@ class_name CutoutSmoothOutward
 ## stay outside the original polygon. This ensures the smoothed result always
 ## contains the entire area of the original shape, making it ideal for collision
 ## detection and visual consistency.
+##
+## WINDING ORDER: Assumes clockwise (CW) polygon winding, consistent with Godot's
+## convention where CW = solid and CCW = hole.
 
 ## Expansion radius in pixels. The polygon is first expanded outward by this amount
 ## to create a safety margin before smoothing. Higher values ensure better containment
@@ -77,9 +80,10 @@ func _expand_polygon(polygon: PackedVector2Array, radius: float) -> PackedVector
 		var edge_before := (curr - prev).normalized()
 		var edge_after := (next - curr).normalized()
 
-		# Calculate normals (perpendicular, pointing outward for CCW winding)
-		var normal_before := Vector2(-edge_before.y, edge_before.x)
-		var normal_after := Vector2(-edge_after.y, edge_after.x)
+		# Calculate normals (perpendicular, pointing outward for CW winding)
+		# For clockwise polygons, use (edge.y, -edge.x) to point outward
+		var normal_before := Vector2(edge_before.y, -edge_before.x)
+		var normal_after := Vector2(edge_after.y, -edge_after.x)
 
 		# Average normal at vertex
 		var vertex_normal := (normal_before + normal_after).normalized()

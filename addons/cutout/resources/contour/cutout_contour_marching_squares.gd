@@ -4,6 +4,10 @@ class_name CutoutContourMarchingSquares
 
 ## Marching squares algorithm for extracting contours from images.
 ## Supports multiple disconnected shapes by using a fill bitmap to track visited regions.
+##
+## WINDING ORDER: The winding order depends on the lookup table configuration.
+## May need verification to ensure it produces clockwise (CW) polygons consistent
+## with Godot's convention where CW = solid and CCW = hole.
 
 # Edge Indices for marching squares
 const EDGE_TOP    = 0

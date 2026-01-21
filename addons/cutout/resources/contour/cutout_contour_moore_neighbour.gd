@@ -1,7 +1,10 @@
 @tool
 class_name CutoutContourMooreNeighbour
 extends CutoutContourAlgorithm
-## Algorithms for producing CutoutContourData fromtextures.
+## Moore Neighbourhood contour tracing algorithm for extracting polygon boundaries from textures.
+##
+## WINDING ORDER: Produces clockwise (CW) polygons, consistent with Godot's
+## convention where CW = solid and CCW = hole.
 
 # Moore neighborhood directions (clockwise from west)
 const DIRECTIONS = [
