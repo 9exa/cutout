@@ -425,11 +425,9 @@ func _draw() -> void:
 				for point in pre_smoothed:
 					draw_circle(point, pre_smoothed_point_radius, pre_smoothed_point_color)
 
-	print("_smoothed_polygons", _smoothed_polygons)
 	# Draw smoothed polygons
 	if show_smoothed and smooth_algorithm:
 		for smoothed in _smoothed_polygons:
-			print("smoothed", smoothed)
 			if smoothed.is_empty():
 				continue
 

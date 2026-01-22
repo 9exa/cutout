@@ -65,7 +65,7 @@ func _get_property_list() -> Array:
 				"name": "area_threshold",
 				"type": TYPE_FLOAT,
 				"usage": PROPERTY_USAGE_DEFAULT,
-				"hint": PROPERTY_HINT_EXP_RANGE,
+				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "0.001,10000.0,0.001"
 			})
 
