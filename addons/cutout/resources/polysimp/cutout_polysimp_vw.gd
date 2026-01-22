@@ -65,8 +65,8 @@ func _get_property_list() -> Array:
 				"name": "area_threshold",
 				"type": TYPE_FLOAT,
 				"usage": PROPERTY_USAGE_DEFAULT,
-				"hint": PROPERTY_HINT_RANGE,
-				"hint_string": "0.0,100.0,0.1"
+				"hint": PROPERTY_HINT_EXP_RANGE,
+				"hint_string": "0.001,10000.0,0.001"
 			})
 
 	return properties
@@ -77,7 +77,6 @@ func _set(property: StringName, value: Variant) -> bool:
 	match property:
 		"proportion":
 			proportion = value
-			tolerance = value  # Sync with base class
 			emit_changed()
 			return true
 		"point_count":
@@ -86,7 +85,6 @@ func _set(property: StringName, value: Variant) -> bool:
 			return true
 		"area_threshold":
 			area_threshold = value
-			tolerance = value  # Sync with base class
 			emit_changed()
 			return true
 	return false
