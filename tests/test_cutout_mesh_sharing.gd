@@ -44,14 +44,10 @@ func _test_shared_instances() -> void:
 		push_error("Failed to create CutoutMesh")
 		return
 
-	# Set material properties on the SHARED resource
-	shared_mesh.side_color = Color(0.8, 0.6, 0.4)  # All instances will have this color
-
 	print("Created shared CutoutMesh resource")
 	print("  Texture: ", test_texture.resource_path)
 	print("  Mask polygons: ", shared_mesh.mask.size())
 	print("  Mesh size: ", shared_mesh.mesh_size)
-	print("  Side color: ", shared_mesh.side_color)
 
 	# Create multiple instances sharing the same mesh AND materials
 	var instance_count := 5
@@ -103,10 +99,6 @@ func _test_unique_instances() -> void:
 			push_error("Failed to create CutoutMesh for instance %d" % i)
 			continue
 
-		# Each instance has unique color
-		var hue := float(i) / float(instance_count)
-		unique_mesh.side_color = Color.from_hsv(hue, 0.8, 0.8)
-
 		var instance := CutoutMeshInstance3D.new()
 		instance.name = "UniqueInstance_%d" % _instance_counter
 		_instance_counter += 1
@@ -121,7 +113,7 @@ func _test_unique_instances() -> void:
 		if Engine.is_editor_hint():
 			instance.owner = get_tree().edited_scene_root
 
-		print("  Created instance %d with UNIQUE CutoutMesh and color %s" % [i, unique_mesh.side_color])
+		print("  Created instance %d with UNIQUE CutoutMesh" % i)
 
 	print("Successfully created %d instances, each with unique CutoutMesh" % instance_count)
 	print("  - %d ArrayMeshes (one per instance)" % instance_count)

@@ -24,12 +24,6 @@ extends Node3D
 		detail_threshold = value
 		_regenerate_example()
 
-@export var side_color: Color = Color(0.7, 0.6, 0.5):
-	set(value):
-		side_color = value
-		if _shared_cutout_mesh:
-			_shared_cutout_mesh.side_color = value
-
 @export var regenerate: bool = false:
 	set(value):
 		if value:
@@ -67,9 +61,6 @@ func _regenerate_example() -> void:
 	if not _shared_cutout_mesh:
 		push_warning("Failed to create CutoutMesh")
 		return
-
-	# Set material properties
-	_shared_cutout_mesh.side_color = side_color
 
 	# Create multiple instances in a row
 	var spacing := 3.0

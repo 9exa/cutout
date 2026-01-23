@@ -48,11 +48,6 @@ enum CutoutMethod {
 		mesh_size = value
 		_regenerate_mesh()
 
-@export var side_color: Color = Color(0.7, 0.6, 0.5, 1.0):
-	set(value):
-		side_color = value
-		_setup_material()
-
 @export var extrusion_texture: Texture2D = null:
 	set(value):
 		extrusion_texture = value
@@ -323,7 +318,7 @@ func _setup_material() -> void:
 
 	_mesh_instance.set_surface_override_material(0, face_material)
 
-	# Material for sides (surface 1) - solid color or textured
+	# Material for sides (surface 1) - textured
 	if mesh.get_surface_count() >= 2:
 		var side_material := StandardMaterial3D.new()
 		side_material.resource_local_to_scene = true
@@ -331,7 +326,8 @@ func _setup_material() -> void:
 		if extrusion_texture:
 			side_material.albedo_texture = extrusion_texture
 		else:
-			side_material.albedo_color = side_color
+			# White fallback if no texture is set
+			side_material.albedo_color = Color.WHITE
 
 		side_material.roughness = 0.9
 		side_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST

@@ -224,6 +224,20 @@ class_name ImagePolygonVisualizer
 		post_smoothed_points_label = value
 		_update_point_list()
 
+@export_group("Output Polygons")
+## The final calculated polygon (read-only, for copying in the editor)
+@export var output_final_polygon: Array[PackedVector2Array]:
+	get:
+		# Return the most processed polygon available
+		if not _post_smoothed_polygons.is_empty():
+			return _post_smoothed_polygons.duplicate()
+		elif not _smoothed_polygons.is_empty():
+			return _smoothed_polygons.duplicate()
+		elif not _pre_smoothed_polygons.is_empty():
+			return _pre_smoothed_polygons.duplicate()
+		else:
+			return _contour_polygons.duplicate()
+
 # Cached pipeline data
 var _contour_polygons: Array[PackedVector2Array] = []
 var _pre_smoothed_polygons: Array[PackedVector2Array] = []

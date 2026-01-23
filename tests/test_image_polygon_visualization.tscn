@@ -16,10 +16,7 @@ start_index = 31
 tolerance = 10.0
 metadata/_custom_type_script = "uid://d1n4ung8wwxcq"
 
-<<<<<<< HEAD
-=======
 [sub_resource type="Resource" id="Resource_uelcw"]
-script = ExtResource("4_gwidm")
 corner_threshold = 35.0
 density_threshold = 2.5
 smooth_strength = 0.43
@@ -29,7 +26,6 @@ metadata/_custom_type_script = "uid://bmniigf7k2eao"
 script = ExtResource("4_38me5")
 metadata/_custom_type_script = "uid://d1n4ung8wwxcq"
 
->>>>>>> 240bf077952e71fb90a492d5955f0f8e4b857a0d
 [node name="ImagePolygonVisualizer" type="Node2D" node_paths=PackedStringArray("contour_points_label", "smoothed_points_label")]
 script = ExtResource("1_dw8u2")
 texture = ExtResource("2_dar6m")

@@ -135,47 +135,64 @@ static func simplify_polygon(points: PackedVector2Array, threshold: float) -> Pa
 # Triangulate polygon with multiple fallback methods for robustness
 static func triangulate_with_fallbacks(points: PackedVector2Array) -> PackedInt32Array:
 	if points.size() < 3:
+		print("[ContourUtils] Triangulation skipped: polygon has less than 3 points")
 		return PackedInt32Array()
 
-	# Method 1: Godot's triangulate_polygon expects CCW winding
-	# Our contour algorithms produce CW polygons, so we need to reverse
+	# Initial state logging
 	var area := compute_polygon_area(points)
 	var is_clockwise := area < 0
+	print("[ContourUtils] Starting triangulation for polygon with ", points.size(), " points")
+	print("[ContourUtils] Area: ", area, ", Winding: ", "CW" if is_clockwise else "CCW")
 
-	# Convert to CCW if needed (Godot expects CCW for solid polygons in triangulation)
-	var ccw_points := points
-	if is_clockwise:
-		ccw_points = PackedVector2Array()
-		for i in range(points.size() - 1, -1, -1):
-			ccw_points.append(points[i])
+	# Method 1: Godot's triangulate_polygon expects CCW winding
+	# Incoming points are already CCW after Y-flip in CutoutMesh, so use them directly
+	print("[ContourUtils] Method 1: Attempting Godot triangulator (trusting incoming winding)")
 
-	var triangles := Geometry2D.triangulate_polygon(ccw_points)
+	var triangles := Geometry2D.triangulate_polygon(points)
 	if not triangles.is_empty():
+		print("[ContourUtils] Method 1: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 		return triangles
+	print("[ContourUtils] Method 1: FAILED - returned empty")
 
 	# Method 2: Try the opposite winding if first attempt failed
+	print("[ContourUtils] Method 2: Attempting opposite winding")
 	var opposite_points := PackedVector2Array()
-	for i in range(ccw_points.size() - 1, -1, -1):
-		opposite_points.append(ccw_points[i])
+	for i in range(points.size() - 1, -1, -1):
+		opposite_points.append(points[i])
 	triangles = Geometry2D.triangulate_polygon(opposite_points)
 	if not triangles.is_empty():
+		print("[ContourUtils] Method 2: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 		return triangles
+	print("[ContourUtils] Method 2: FAILED - returned empty")
 
 	# Method 3: Try removing duplicate/degenerate vertices
+	print("[ContourUtils] Method 3: Cleaning degenerate vertices")
 	var cleaned := clean_polygon(points)
+	var removed_count := points.size() - cleaned.size()
+	print("[ContourUtils] Method 3: Removed ", removed_count, " vertices (", cleaned.size(), " remaining)")
 	if cleaned.size() >= 3:
 		triangles = Geometry2D.triangulate_polygon(cleaned)
 		if not triangles.is_empty():
+			print("[ContourUtils] Method 3: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 			return triangles
+	print("[ContourUtils] Method 3: FAILED - returned empty")
 
 	# Method 4: Fallback to ear clipping algorithm
+	print("[ContourUtils] Method 4: Attempting custom ear clipping")
 	triangles = ear_clipping_triangulation(points)
 	if not triangles.is_empty():
+		print("[ContourUtils] Method 4: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 		return triangles
+	print("[ContourUtils] Method 4: FAILED - ear clipping failed")
 
 	# Method 5: Last resort - use convex hull
+	push_warning("[ContourUtils] ⚠️ WARNING: Method 5 - Using CONVEX HULL fallback")
+	push_warning("[ContourUtils] ⚠️ This will create triangles OUTSIDE the polygon boundary!")
+	print("[ContourUtils] Method 5: Generating convex hull")
 	var hull := Geometry2D.convex_hull(points)
+	print("[ContourUtils] Method 5: Hull has ", hull.size(), " points (original had ", points.size(), " points)")
 	triangles = Geometry2D.triangulate_polygon(hull)
+	print("[ContourUtils] Method 5: Generated ", triangles.size() / 3, " triangles from convex hull")
 	return triangles
 
 # Remove duplicate and degenerate vertices from polygon

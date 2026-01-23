@@ -46,14 +46,8 @@ extends Resource
 		extrusion_texture_scale = value
 		_invalidate_mesh()
 
-## Color for the side walls when no extrusion_texture is set.
-@export var side_color: Color = Color(0.7, 0.6, 0.5, 1.0):
-	set(value):
-		side_color = value
-		_invalidate_materials()
-
-## Optional texture for the side walls.
-## If set, this overrides side_color for the extrusion sides.
+## Texture for the extrusion side walls.
+## Use a 1x1 solid color texture for uniform color, or a gradient for varied effects.
 @export var extrusion_texture: Texture2D:
 	set(value):
 		extrusion_texture = value
@@ -148,6 +142,8 @@ func _invalidate_mesh() -> void:
 
 ## Marks the materials as dirty, forcing regeneration on next get_*_material() call.
 func _invalidate_materials() -> void:
+	_cached_face_material = null
+	_cached_side_material = null
 	_materials_dirty = true
 	emit_changed()
 
@@ -190,7 +186,8 @@ func _create_side_material() -> StandardMaterial3D:
 	if extrusion_texture:
 		material.albedo_texture = extrusion_texture
 	else:
-		material.albedo_color = side_color
+		# White fallback if no texture is set
+		material.albedo_color = Color.WHITE
 
 	material.roughness = 0.9
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
@@ -253,10 +250,11 @@ func _generate_3d_mesh(polygon: PackedVector2Array, image: Image) -> ArrayMesh:
 		# UV: direct mapping from pixel position to 0-1
 		uvs.append(Vector2(p.x / width, p.y / height))
 
+
 	# Triangulate the polygon with fallback methods
 	var triangles := ContourUtils.triangulate_with_fallbacks(vertices_2d)
 	if triangles.is_empty():
-		push_warning("CutoutMesh: Triangulation failed")
+		push_warning("[CutoutMesh] Triangulation FAILED - all methods returned empty")
 		return null
 
 	# SURFACE 0: Front and back faces (textured)
