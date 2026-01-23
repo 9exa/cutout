@@ -1,6 +1,8 @@
 @tool
 extends EditorPlugin
 
+const CutoutDock = preload("res://addons/cutout/ui/cutout_dock.tscn")
+var dock_instance
 
 func _enter_tree() -> void:
 	# Register the CardboardCutout node as a custom node type
@@ -21,9 +23,21 @@ func _enter_tree() -> void:
 	)
 	print("Cutout plugin: CutoutMeshInstance3D node registered")
 
+	# Create and add the editor dock
+	dock_instance = CutoutDock.instantiate()
+	add_control_to_bottom_panel(dock_instance, "Cutout")
+	print("Cutout plugin: Editor dock added")
+
 
 func _exit_tree() -> void:
 	# Clean up the custom node types when plugin is disabled
 	remove_custom_type("CardboardCutout")
 	remove_custom_type("CutoutMeshInstance3D")
-	print("Cutout plugin: CardboardCutout and CutoutMeshInstance3D nodes unregistered")
+
+	# Remove the editor dock
+	if dock_instance:
+		remove_control_from_bottom_panel(dock_instance)
+		dock_instance.queue_free()
+		dock_instance = null
+
+	print("Cutout plugin: CardboardCutout and CutoutMeshInstance3D nodes unregistered and dock removed")

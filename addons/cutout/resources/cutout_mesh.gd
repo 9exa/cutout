@@ -129,7 +129,7 @@ static func create_from_texture(
 ## The mesh is cached and only regenerated when properties change.
 func get_mesh() -> ArrayMesh:
 	if _mesh_dirty or not _cached_mesh:
-		_cached_mesh = _generate_mesh()
+		_cached_mesh = generate_mesh()
 		_mesh_dirty = false
 	return _cached_mesh
 
@@ -197,7 +197,7 @@ func _create_side_material() -> StandardMaterial3D:
 
 
 ## Generates the 3D mesh from the current texture and mask.
-func _generate_mesh() -> ArrayMesh:
+func generate_mesh() -> ArrayMesh:
 	# Validation
 	if not texture:
 		push_warning("CutoutMesh: No texture set")

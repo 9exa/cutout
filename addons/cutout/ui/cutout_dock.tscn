@@ -1,0 +1,420 @@
+[gd_scene load_steps=2 format=3 uid="uid://bqxvqn7jdyxvl"]
+
+[ext_resource type="Script" uid="uid://bdc537hr71e7k" path="res://addons/cutout/ui/cutout_dock.gd" id="1"]
+
+[node name="CutoutDock" type="VBoxContainer" node_paths=PackedStringArray("image_section", "image_section_button", "image_section_content", "image_selector_button", "image_path_label", "contour_section", "contour_section_button", "contour_section_content", "contour_algorithm_option", "alpha_threshold_slider", "alpha_threshold_value", "pre_simp_section", "pre_simp_section_button", "pre_simp_section_content", "pre_simp_algorithm_option", "pre_simp_params", "smooth_section", "smooth_section_button", "smooth_section_content", "smooth_algorithm_option", "smooth_params", "post_simp_section", "post_simp_section_button", "post_simp_section_content", "post_simp_algorithm_option", "post_simp_params", "preview_section", "preview_section_button", "preview_section_content", "preview_viewport", "preview_camera", "mesh_settings_section", "mesh_settings_button", "mesh_settings_content", "depth_slider", "depth_value", "mesh_width_spinbox", "mesh_height_spinbox", "export_section", "export_section_button", "export_section_content", "export_button", "export_path_line")]
+custom_minimum_size = Vector2(300, 600)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = 310.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+image_selector_button = NodePath("HBoxContainer/VBoxContainer/ImageSection/ImageSelector")
+image_path_label = NodePath("HBoxContainer/VBoxContainer/ImageSection/ImagePath")
+contour_section = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection")
+contour_section_button = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionButton")
+contour_section_content = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent")
+contour_algorithm_option = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlgorithmSelector/OptionButton")
+alpha_threshold_slider = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold/HSlider")
+alpha_threshold_value = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold/Value")
+pre_simp_section = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection")
+pre_simp_section_button = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionButton")
+pre_simp_section_content = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent")
+pre_simp_algorithm_option = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent/AlgorithmSelector/OptionButton")
+pre_simp_params = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent/Parameters")
+smooth_section = NodePath("HBoxContainer/VBoxContainer/PipelineSection/SmoothSection")
+smooth_section_button = NodePath("HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionButton")
+smooth_section_content = NodePath("HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent")
+smooth_algorithm_option = NodePath("HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent/AlgorithmSelector/OptionButton")
+smooth_params = NodePath("HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent/Parameters")
+post_simp_section = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection")
+post_simp_section_button = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionButton")
+post_simp_section_content = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent")
+post_simp_algorithm_option = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent/AlgorithmSelector/OptionButton")
+post_simp_params = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent/Parameters")
+preview_viewport = NodePath("HBoxContainer/PreviewSection/ViewportContainer/SubViewport")
+preview_camera = NodePath("HBoxContainer/PreviewSection/ViewportContainer/SubViewport/Camera2D")
+mesh_settings_section = NodePath("HBoxContainer/VBoxContainer/MeshSettings")
+mesh_settings_button = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsButton")
+mesh_settings_content = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent")
+depth_slider = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/Depth/HSlider")
+depth_value = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/Depth/Value")
+mesh_width_spinbox = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/MeshSize/WidthSpinBox")
+mesh_height_spinbox = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/MeshSize/HeightSpinBox")
+export_button = NodePath("HBoxContainer/VBoxContainer/ExportSection/ExportButton")
+export_path_line = NodePath("HBoxContainer/VBoxContainer/ExportSection/PathLine")
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Cutout Image Processor"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="."]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ImageSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="SectionLabel" type="Label" parent="HBoxContainer/VBoxContainer/ImageSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "1. Select Image"
+
+[node name="ImageSelector" type="Button" parent="HBoxContainer/VBoxContainer/ImageSection"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+text = "Load Image..."
+
+[node name="ImagePath" type="Label" parent="HBoxContainer/VBoxContainer/ImageSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "No image selected"
+autowrap_mode = 2
+
+[node name="HSeparator2" type="HSeparator" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="PipelineSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="SectionLabel" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "2. Pipeline Configuration"
+
+[node name="ContourSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection"]
+layout_mode = 2
+
+[node name="ContourSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection"]
+modulate = Color(0.95, 0.95, 0.95, 1)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "▼ Contour Extraction"
+alignment = 0
+
+[node name="ContourSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AlgorithmSelector" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Algorithm:"
+
+[node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+selected = 0
+item_count = 6
+popup/item_0/text = "Moore Neighbour"
+popup/item_0/id = 0
+popup/item_1/text = "Marching Squares"
+popup/item_1/id = 1
+popup/item_2/text = "Moore Neighbour"
+popup/item_2/id = 2
+popup/item_3/text = "Marching Squares"
+popup/item_3/id = 3
+popup/item_4/text = "Moore Neighbour"
+popup/item_4/id = 4
+popup/item_5/text = "Marching Squares"
+popup/item_5/id = 5
+
+[node name="AlphaThreshold" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Alpha Threshold:"
+
+[node name="HSlider" type="HSlider" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="Value" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "0.50"
+
+[node name="PreSimpSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection"]
+layout_mode = 2
+
+[node name="PreSimpSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection"]
+modulate = Color(0.95, 0.95, 0.95, 1)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "▼ Pre-Simplification (Mandatory)"
+alignment = 0
+
+[node name="PreSimpSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AlgorithmSelector" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Algorithm:"
+
+[node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+selected = 0
+item_count = 9
+popup/item_0/text = "Ramer-Douglas-Peucker"
+popup/item_0/id = 0
+popup/item_1/text = "Reumann-Witkam"
+popup/item_1/id = 1
+popup/item_2/text = "Visvalingam-Whyatt"
+popup/item_2/id = 2
+popup/item_3/text = "Ramer-Douglas-Peucker"
+popup/item_3/id = 3
+popup/item_4/text = "Reumann-Witkam"
+popup/item_4/id = 4
+popup/item_5/text = "Visvalingam-Whyatt"
+popup/item_5/id = 5
+popup/item_6/text = "Ramer-Douglas-Peucker"
+popup/item_6/id = 6
+popup/item_7/text = "Reumann-Witkam"
+popup/item_7/id = 7
+popup/item_8/text = "Visvalingam-Whyatt"
+popup/item_8/id = 8
+
+[node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent"]
+layout_mode = 2
+
+[node name="SmoothSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection"]
+layout_mode = 2
+
+[node name="SmoothSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection"]
+modulate = Color(0.95, 0.95, 0.95, 1)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "▼ Smoothing (Mandatory)"
+alignment = 0
+
+[node name="SmoothSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AlgorithmSelector" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Algorithm:"
+
+[node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+selected = 0
+item_count = 3
+popup/item_0/text = "Outward Smooth"
+popup/item_0/id = 0
+popup/item_1/text = "Outward Smooth"
+popup/item_1/id = 1
+popup/item_2/text = "Outward Smooth"
+popup/item_2/id = 2
+
+[node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent"]
+layout_mode = 2
+
+[node name="PostSimpSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection"]
+layout_mode = 2
+
+[node name="PostSimpSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection"]
+modulate = Color(0.95, 0.95, 0.95, 1)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "▼ Post-Simplification (Mandatory)"
+alignment = 0
+
+[node name="PostSimpSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AlgorithmSelector" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Algorithm:"
+
+[node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent/AlgorithmSelector"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+selected = 0
+item_count = 9
+popup/item_0/text = "Ramer-Douglas-Peucker"
+popup/item_0/id = 0
+popup/item_1/text = "Reumann-Witkam"
+popup/item_1/id = 1
+popup/item_2/text = "Visvalingam-Whyatt"
+popup/item_2/id = 2
+popup/item_3/text = "Ramer-Douglas-Peucker"
+popup/item_3/id = 3
+popup/item_4/text = "Reumann-Witkam"
+popup/item_4/id = 4
+popup/item_5/text = "Visvalingam-Whyatt"
+popup/item_5/id = 5
+popup/item_6/text = "Ramer-Douglas-Peucker"
+popup/item_6/id = 6
+popup/item_7/text = "Reumann-Witkam"
+popup/item_7/id = 7
+popup/item_8/text = "Visvalingam-Whyatt"
+popup/item_8/id = 8
+
+[node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent"]
+layout_mode = 2
+
+[node name="HSeparator3" type="HSeparator" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="MeshSettings" type="VBoxContainer" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="MeshSettingsButton" type="Button" parent="HBoxContainer/VBoxContainer/MeshSettings"]
+modulate = Color(0.95, 0.95, 0.95, 1)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "▼ Mesh Settings"
+alignment = 0
+
+[node name="MeshSettingsContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/MeshSettings"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Depth" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/Depth"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Depth:"
+
+[node name="HSlider" type="HSlider" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/Depth"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+min_value = 0.01
+max_value = 1.0
+step = 0.01
+value = 0.09999999999999999
+
+[node name="Value" type="Label" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/Depth"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "0.10"
+
+[node name="MeshSize" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/MeshSize"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Mesh Size:"
+
+[node name="WidthLabel" type="Label" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/MeshSize"]
+layout_mode = 2
+text = "W:"
+
+[node name="WidthSpinBox" type="SpinBox" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/MeshSize"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+min_value = 0.1
+max_value = 10.0
+step = 0.1
+value = 1.0
+
+[node name="HeightLabel" type="Label" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/MeshSize"]
+layout_mode = 2
+text = "H:"
+
+[node name="HeightSpinBox" type="SpinBox" parent="HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent/MeshSize"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+min_value = 0.1
+max_value = 10.0
+step = 0.1
+value = 1.0
+
+[node name="HSeparator4" type="HSeparator" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ExportSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="SectionLabel" type="Label" parent="HBoxContainer/VBoxContainer/ExportSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "5. Export"
+
+[node name="LastSavedLabel" type="Label" parent="HBoxContainer/VBoxContainer/ExportSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "Last saved:"
+
+[node name="PathLine" type="LineEdit" parent="HBoxContainer/VBoxContainer/ExportSection"]
+layout_mode = 2
+placeholder_text = "No file saved yet"
+editable = false
+context_menu_enabled = false
+
+[node name="ExportButton" type="Button" parent="HBoxContainer/VBoxContainer/ExportSection"]
+custom_minimum_size = Vector2(0, 35)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Save CutoutMesh..."
+
+[node name="PreviewSection" type="VBoxContainer" parent="HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SectionLabel" type="Label" parent="HBoxContainer/PreviewSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "3. Preview"
+
+[node name="ViewportContainer" type="SubViewportContainer" parent="HBoxContainer/PreviewSection"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+size_flags_vertical = 3
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="HBoxContainer/PreviewSection/ViewportContainer"]
+handle_input_locally = false
+size = Vector2i(574, 896)
+render_target_update_mode = 4
+
+[node name="Camera2D" type="Camera2D" parent="HBoxContainer/PreviewSection/ViewportContainer/SubViewport"]
+position = Vector2(100, 100)

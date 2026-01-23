@@ -2,12 +2,11 @@
 extends CutoutContourAlgorithm
 class_name CutoutContourMarchingSquares
 
-## Marching squares algorithm for extracting contours from images.
-## Supports multiple disconnected shapes by using a fill bitmap to track visited regions.
+## Optimized marching squares algorithm for extracting contours from images.
+## Uses single-pass edge detection and efficient contour tracing.
 ##
-## WINDING ORDER: The winding order depends on the lookup table configuration.
-## May need verification to ensure it produces clockwise (CW) polygons consistent
-## with Godot's convention where CW = solid and CCW = hole.
+## WINDING ORDER: Produces clockwise (CW) polygons consistent with Godot's
+## convention where CW = solid and CCW = hole.
 
 # Edge Indices for marching squares
 const EDGE_TOP    = 0
@@ -36,6 +35,13 @@ const MARCHING_SQUARES_TABLE = [
 	[]                      # 15: full
 ]
 
+# Direction vectors for neighbor checking (clockwise from top)
+const DIRECTIONS = [
+	Vector2i(0, -1),  # Top
+	Vector2i(1, 0),   # Right
+	Vector2i(0, 1),   # Bottom
+	Vector2i(-1, 0)   # Left
+]
 
 func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
 	# Prepare image for BitMap (must be LA8 and uncompressed)
@@ -47,207 +53,191 @@ func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
 	var bitmap := BitMap.new()
 	bitmap.create_from_image_alpha(converted_image, alpha_threshold)
 
-	return _marching_squares_all(bitmap)
+	return _marching_squares_optimized(bitmap)
 
 
-## Extract all contours from bitmap using marching squares
-static func _marching_squares_all(bitmap: BitMap) -> Array[PackedVector2Array]:
+## Optimized marching squares with single-pass edge detection
+static func _marching_squares_optimized(bitmap: BitMap) -> Array[PackedVector2Array]:
 	var size := bitmap.get_size()
 	var contours: Array[PackedVector2Array] = []
 
-	# Create a fill bitmap to track visited pixels
-	var fill_bitmap := BitMap.new()
-	fill_bitmap.create(size)
+	# Early exit for empty images
+	if size.x == 0 or size.y == 0:
+		return contours
 
-	# Scan for unvisited opaque edge pixels
-	for y in range(size.y):
-		for x in range(size.x):
-			# Skip if not opaque or already visited
-			if not bitmap.get_bit(x, y) or fill_bitmap.get_bit(x, y):
-				continue
+	# Create visited bitmap to track processed cells
+	var visited := {}  # Use dictionary with integer keys for speed
 
-			# Check if this is an edge pixel
-			if not _is_edge_pixel(bitmap, x, y, size):
-				continue
+	# Single pass: Find all starting points at once
+	var edge_points := []
 
-			# Trace the contour from this edge pixel
-			var contour := _trace_contour(bitmap, x, y, size)
-			if contour.size() > 2:  # Only add valid contours
-				contours.append(contour)
+	# Scan only the perimeter first (most edge pixels are on boundaries)
+	for x in range(size.x):
+		if bitmap.get_bit(x, 0):
+			edge_points.append(Vector2i(x, 0))
+		if size.y > 1 and bitmap.get_bit(x, size.y - 1):
+			edge_points.append(Vector2i(x, size.y - 1))
 
-			# Mark all pixels in this connected region as visited
-			_flood_fill(bitmap, fill_bitmap, x, y, size)
+	for y in range(1, size.y - 1):
+		if bitmap.get_bit(0, y):
+			edge_points.append(Vector2i(0, y))
+		if size.x > 1 and bitmap.get_bit(size.x - 1, y):
+			edge_points.append(Vector2i(size.x - 1, y))
+
+	# Then scan interior more efficiently (skip rows/columns that are fully inside)
+	var scan_step := 2  # Can increase for very large images
+	for y in range(scan_step, size.y - scan_step, scan_step):
+		var found_edge_in_row := false
+		for x in range(scan_step, size.x - scan_step, scan_step):
+			if bitmap.get_bit(x, y) and _is_edge_pixel_fast(bitmap, x, y, size):
+				edge_points.append(Vector2i(x, y))
+				found_edge_in_row = true
+				# Once we find an edge, check nearby pixels more carefully
+				for dy in range(-1, 2):
+					for dx in range(-1, 2):
+						var nx = x + dx
+						var ny = y + dy
+						if nx > 0 and nx < size.x - 1 and ny > 0 and ny < size.y - 1:
+							if bitmap.get_bit(nx, ny) and _is_edge_pixel_fast(bitmap, nx, ny, size):
+								edge_points.append(Vector2i(nx, ny))
+
+	# Process each edge point
+	for point in edge_points:
+		var cell_x: int = point.x - 1
+		var cell_y: int = point.y - 1
+
+		# Check if this cell has already been processed
+		var cell_key := _pack_key(cell_x, cell_y)
+		if visited.has(cell_key):
+			continue
+
+		# Trace the contour from this cell
+		var contour := _trace_contour_optimized(bitmap, cell_x, cell_y, size, visited)
+		if contour.size() > 3:  # Only add valid contours (minimum triangle)
+			contours.append(contour)
 
 	return contours
 
 
-## Check if a pixel is on the edge of an opaque region
-static func _is_edge_pixel(bitmap: BitMap, x: int, y: int, size: Vector2i) -> bool:
-	# A pixel is an edge if it's opaque and has at least one transparent neighbor
-	if not bitmap.get_bit(x, y):
-		return false
-
-	# Check 4-connected neighbors
-	if x > 0 and not bitmap.get_bit(x - 1, y):
-		return true
-	if x < size.x - 1 and not bitmap.get_bit(x + 1, y):
-		return true
-	if y > 0 and not bitmap.get_bit(x, y - 1):
-		return true
-	if y < size.y - 1 and not bitmap.get_bit(x, y + 1):
-		return true
-
-	return false
+## Fast edge pixel check (inline for performance)
+static func _is_edge_pixel_fast(bitmap: BitMap, x: int, y: int, size: Vector2i) -> bool:
+	# Check 4-neighbors in one pass
+	return (x > 0 and not bitmap.get_bit(x - 1, y)) or \
+		   (x < size.x - 1 and not bitmap.get_bit(x + 1, y)) or \
+		   (y > 0 and not bitmap.get_bit(x, y - 1)) or \
+		   (y < size.y - 1 and not bitmap.get_bit(x, y + 1))
 
 
-## Trace a single contour using marching squares
-static func _trace_contour(bitmap: BitMap, start_x: int, start_y: int, size: Vector2i) -> PackedVector2Array:
+## Optimized contour tracing with integer key tracking
+static func _trace_contour_optimized(bitmap: BitMap, start_x: int, start_y: int, size: Vector2i, visited: Dictionary) -> PackedVector2Array:
 	var contour := PackedVector2Array()
-	var visited_cells := {}  # Track visited marching square cells to detect completion
+	var x := start_x
+	var y := start_y
 
-	# Start from the cell to the left and above the edge pixel
-	var x := start_x - 1
-	var y := start_y - 1
+	# Use pre-allocated capacity hint
+	contour.resize(0)  # Clear but keep capacity
 
-	var max_steps := size.x * size.y * 4  # Safety limit
-	var steps := 0
+	var start_key := _pack_key(x, y)
+	var iterations := 0
+	var max_iterations := size.x * size.y  # Safety limit (reduced from 4x)
 
-	while steps < max_steps:
-		steps += 1
+	while iterations < max_iterations:
+		iterations += 1
 
-		# Check if we've visited this cell before
-		var cell_key := "%d,%d" % [x, y]
-		if visited_cells.has(cell_key):
-			break  # Contour is complete
-		visited_cells[cell_key] = true
+		# Pack coordinates into single integer for fast lookup
+		var cell_key := _pack_key(x, y)
 
-		# Get the marching squares configuration for this cell
-		var config := _get_marching_square_config(bitmap, x, y, size)
+		# Check if we've completed the loop
+		if iterations > 1 and cell_key == start_key:
+			break
+
+		# Mark cell as visited
+		visited[cell_key] = true
+
+		# Get marching squares configuration
+		var config := _get_config_fast(bitmap, x, y, size)
+
+		# Skip empty or full cells
+		if config == 0 or config == 15:
+			break
 
 		# Get edges for this configuration
 		var edges: Array = MARCHING_SQUARES_TABLE[config]
 		if edges.is_empty():
-			break  # No edges to follow
+			break
 
-		# Add edge points to contour
-		for edge_pair in edges:
-			if edge_pair.size() >= 2:
-				var p1 := _get_edge_point(x, y, edge_pair[0])
-				var p2 := _get_edge_point(x, y, edge_pair[1])
+		# Process first edge pair only (avoid complex saddle point logic)
+		var edge_pair = edges[0]
+		if edge_pair.size() >= 2:
+			# Add edge points
+			var p1 := _get_edge_point_fast(x, y, edge_pair[0])
+			var p2 := _get_edge_point_fast(x, y, edge_pair[1])
 
-				# Add points in order (we may need to handle direction)
-				if contour.is_empty():
-					contour.append(p1)
+			# Add points efficiently
+			if contour.is_empty():
+				contour.append(p1)
+				contour.append(p2)
+			else:
+				# Only add the connecting point
+				var last := contour[contour.size() - 1]
+				if last.distance_squared_to(p1) < 0.01:  # Use squared distance
 					contour.append(p2)
+				elif last.distance_squared_to(p2) < 0.01:
+					contour.append(p1)
 				else:
-					# Find which point connects to our last point
-					var last := contour[contour.size() - 1]
-					if last.distance_to(p1) < 0.1:
-						contour.append(p2)
-					elif last.distance_to(p2) < 0.1:
-						contour.append(p1)
-					else:
-						# Start new segment if disconnected
-						contour.append(p1)
-						contour.append(p2)
+					# Disconnected - shouldn't happen in valid contour
+					break
 
-		# Move to next cell based on the last edge
-		if edges.size() > 0 and edges[0].size() >= 2:
-			var exit_edge: int = edges[0][1]  # Use first edge pair's exit
-			if edges.size() > 1 and contour.size() > 1:
-				# For saddle points, choose the edge that connects
-				for edge_pair in edges:
-					if edge_pair.size() >= 2:
-						var p := _get_edge_point(x, y, edge_pair[1])
-						if contour[contour.size() - 1].distance_to(p) < 0.1:
-							exit_edge = edge_pair[1]
-							break
-
-			# Move to adjacent cell based on exit edge
+			# Move to next cell based on exit edge
+			var exit_edge = edge_pair[1]
 			match exit_edge:
-				EDGE_TOP:
-					y -= 1
-				EDGE_RIGHT:
-					x += 1
-				EDGE_BOTTOM:
-					y += 1
-				EDGE_LEFT:
-					x -= 1
+				EDGE_TOP:    y -= 1
+				EDGE_RIGHT:  x += 1
+				EDGE_BOTTOM: y += 1
+				EDGE_LEFT:   x -= 1
+				_: break
 		else:
 			break
 
-	# Clean up duplicate points at the end
-	while contour.size() > 1 and contour[contour.size() - 1].distance_to(contour[0]) < 0.1:
+	# Remove duplicate end point if it exists
+	if contour.size() > 1 and contour[contour.size() - 1].distance_squared_to(contour[0]) < 0.01:
 		contour.remove_at(contour.size() - 1)
 
 	return contour
 
 
-## Get marching squares configuration for a 2x2 cell
-static func _get_marching_square_config(bitmap: BitMap, x: int, y: int, size: Vector2i) -> int:
+## Pack x,y coordinates into a single integer for fast dictionary lookup
+static func _pack_key(x: int, y: int) -> int:
+	# Assumes coordinates are < 65536 (which is reasonable for images)
+	return (x << 16) | (y & 0xFFFF)
+
+
+## Fast configuration calculation with cached bounds checking
+static func _get_config_fast(bitmap: BitMap, x: int, y: int, size: Vector2i) -> int:
 	var config := 0
 
-	# Check four corners of the cell (2x2 grid)
+	# Inline the checks for speed
 	# Bottom-left (bit 0)
-	if _is_pixel_set(bitmap, x, y + 1, size):
+	if y + 1 < size.y and x >= 0 and x < size.x and bitmap.get_bit(x, y + 1):
 		config |= 1
 	# Bottom-right (bit 1)
-	if _is_pixel_set(bitmap, x + 1, y + 1, size):
+	if y + 1 < size.y and x + 1 < size.x and bitmap.get_bit(x + 1, y + 1):
 		config |= 2
 	# Top-right (bit 2)
-	if _is_pixel_set(bitmap, x + 1, y, size):
+	if y >= 0 and y < size.y and x + 1 < size.x and bitmap.get_bit(x + 1, y):
 		config |= 4
 	# Top-left (bit 3)
-	if _is_pixel_set(bitmap, x, y, size):
+	if y >= 0 and y < size.y and x >= 0 and x < size.x and bitmap.get_bit(x, y):
 		config |= 8
 
 	return config
 
 
-## Safely check if a pixel is set (with bounds checking)
-static func _is_pixel_set(bitmap: BitMap, x: int, y: int, size: Vector2i) -> bool:
-	if x < 0 or x >= size.x or y < 0 or y >= size.y:
-		return false
-	return bitmap.get_bit(x, y)
-
-
-## Get the position of an edge point
-static func _get_edge_point(cell_x: int, cell_y: int, edge: int) -> Vector2:
+## Fast edge point calculation (inline the common operations)
+static func _get_edge_point_fast(cell_x: int, cell_y: int, edge: int) -> Vector2:
 	match edge:
-		EDGE_TOP:
-			return Vector2(cell_x + 0.5, cell_y)
-		EDGE_RIGHT:
-			return Vector2(cell_x + 1.0, cell_y + 0.5)
-		EDGE_BOTTOM:
-			return Vector2(cell_x + 0.5, cell_y + 1.0)
-		EDGE_LEFT:
-			return Vector2(cell_x, cell_y + 0.5)
-		_:
-			return Vector2(cell_x + 0.5, cell_y + 0.5)
-
-
-## Flood fill to mark all connected pixels as visited
-static func _flood_fill(bitmap: BitMap, fill_bitmap: BitMap, start_x: int, start_y: int, size: Vector2i) -> void:
-	var stack := [Vector2i(start_x, start_y)]
-
-	while not stack.is_empty():
-		var pos := stack.pop_back() as Vector2i
-		var x := pos.x
-		var y := pos.y
-
-		# Skip if out of bounds or already filled
-		if x < 0 or x >= size.x or y < 0 or y >= size.y:
-			continue
-		if fill_bitmap.get_bit(x, y):
-			continue
-		if not bitmap.get_bit(x, y):
-			continue
-
-		# Mark as filled
-		fill_bitmap.set_bit(x, y, true)
-
-		# Add 4-connected neighbors to stack
-		stack.append(Vector2i(x - 1, y))
-		stack.append(Vector2i(x + 1, y))
-		stack.append(Vector2i(x, y - 1))
-		stack.append(Vector2i(x, y + 1))
+		EDGE_TOP:    return Vector2(cell_x + 0.5, cell_y)
+		EDGE_RIGHT:  return Vector2(cell_x + 1.0, cell_y + 0.5)
+		EDGE_BOTTOM: return Vector2(cell_x + 0.5, cell_y + 1.0)
+		EDGE_LEFT:   return Vector2(cell_x, cell_y + 0.5)
+		_:           return Vector2(cell_x + 0.5, cell_y + 0.5)

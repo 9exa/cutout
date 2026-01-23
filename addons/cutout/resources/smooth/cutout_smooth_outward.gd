@@ -16,7 +16,7 @@ class_name CutoutSmoothOutward
 ## Expansion radius in pixels. The polygon is first expanded outward by this amount
 ## to create a safety margin before smoothing. Higher values ensure better containment
 ## but may create larger polygons.
-@export var expansion_radius: float = 2.0:
+@export_range(0.0, 100.0, 0.01, "exp") var expansion_radius: float = 2.0:
 	set(value):
 		expansion_radius = value
 		emit_changed()
@@ -44,7 +44,7 @@ class_name CutoutSmoothOutward
 
 ## Density threshold for detecting overcrowded regions. Points closer than this
 ## distance are considered dense and receive more aggressive smoothing.
-@export_range(0.5, 10.0, 0.5) var density_threshold: float = 3.0:
+@export_range(0.0, 100.0, 0.01, "exp") var density_threshold: float = 3.0:
 	set(value):
 		density_threshold = value
 		emit_changed()
