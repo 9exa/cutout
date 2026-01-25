@@ -72,59 +72,6 @@ var _materials_dirty: bool = true
 ## @param smooth_algorithm: Optional smoothing algorithm to apply to the polygon
 ## @param depth: Extrusion depth for the 3D mesh
 ## @param mesh_size: Physical size in world units (auto-calculated from texture if Vector2.ZERO)
-## @return: A new CutoutMesh resource, or null if contour extraction failed
-static func create_from_texture(
-	texture: Texture2D,
-	alpha_threshold: float = 0.5,
-	detail_threshold: float = 2.0,
-	smooth_algorithm: CutoutSmoothAlgorithm = null,
-	depth: float = 0.1,
-	mesh_size: Vector2 = Vector2.ZERO
-) -> CutoutMesh:
-	if not texture:
-		push_warning("CutoutMesh.create_from_texture: No texture provided")
-		return null
-
-	# Get image data
-	var image := texture.get_image()
-	if not image:
-		push_warning("CutoutMesh.create_from_texture: Could not get image from texture")
-		return null
-
-	# Decompress if needed
-	if image.is_compressed():
-		image.decompress()
-
-	# Extract contour
-	var contour := ContourUtils.extract_contour(image, alpha_threshold)
-	if contour.is_empty():
-		push_warning("CutoutMesh.create_from_texture: No contour found in texture")
-		return null
-
-	# Simplify the contour
-	var simplified := ContourUtils.simplify_polygon(contour, detail_threshold)
-
-	# Apply smoothing if algorithm is set
-	if smooth_algorithm:
-		simplified = smooth_algorithm.smooth(simplified)
-
-	# Auto-calculate mesh_size from texture dimensions if not provided
-	var final_mesh_size := mesh_size
-	if mesh_size == Vector2.ZERO:
-		var width_pixels := image.get_width()
-		var height_pixels := image.get_height()
-		final_mesh_size = Vector2(width_pixels * 0.01, height_pixels * 0.01)
-
-	# Create the CutoutMesh resource
-	var cutout_mesh := CutoutMesh.new()
-	cutout_mesh.texture = texture
-	cutout_mesh.mask = [simplified]  # Store as first polygon in mask array
-	cutout_mesh.depth = depth
-	cutout_mesh.mesh_size = final_mesh_size
-
-	return cutout_mesh
-
-
 ## Returns the generated mesh, creating it if necessary.
 ## The mesh is cached and only regenerated when properties change.
 func get_mesh() -> ArrayMesh:
@@ -174,7 +121,7 @@ func _create_face_material() -> StandardMaterial3D:
 		material.albedo_texture = texture
 
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED  # Show both sides
+	material.cull_mode = BaseMaterial3D.CULL_BACK # Only show front
 
 	return material
 
@@ -252,7 +199,7 @@ func _generate_3d_mesh(polygon: PackedVector2Array, image: Image) -> ArrayMesh:
 
 
 	# Triangulate the polygon with fallback methods
-	var triangles := ContourUtils.triangulate_with_fallbacks(vertices_2d)
+	var triangles := CutoutGeometryUtils.triangulate_with_fallbacks(vertices_2d)
 	if triangles.is_empty():
 		push_warning("[CutoutMesh] Triangulation FAILED - all methods returned empty")
 		return null
@@ -270,7 +217,11 @@ func _generate_3d_mesh(polygon: PackedVector2Array, image: Image) -> ArrayMesh:
 		face_normals.append(Vector3(0, 0, 1))
 
 	# Front face triangles using triangulation
-	face_indices.append_array(triangles)
+	# face_indices.append_array(triangles)
+	for i in range(0, triangles.size(), 3):
+		face_indices.append(triangles[i])
+		face_indices.append(triangles[i + 2]) # Reversed. Clockwise
+		face_indices.append(triangles[i + 1])
 
 	# Back face (z = -half_depth)
 	var back_start := vertices_2d.size()
@@ -282,8 +233,8 @@ func _generate_3d_mesh(polygon: PackedVector2Array, image: Image) -> ArrayMesh:
 	# Back face triangles (reversed winding for correct normals)
 	for i in range(0, triangles.size(), 3):
 		face_indices.append(back_start + triangles[i])
-		face_indices.append(back_start + triangles[i + 2])  # Reversed
 		face_indices.append(back_start + triangles[i + 1])  # Reversed
+		face_indices.append(back_start + triangles[i + 2])  # Reversed
 
 	# Create face surface
 	var face_arrays := []

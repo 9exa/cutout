@@ -73,8 +73,21 @@ var post_simp_algorithm: CutoutPolysimpAlgorithm
 # Polygon preview instance
 var polygon_preview: Node2D
 
-# Pipeline result
-var final_polygon: PackedVector2Array
+# Pipeline results - intermediate polygons for incremental computation
+var contour_polygon: PackedVector2Array = PackedVector2Array()
+var pre_simp_polygon: PackedVector2Array = PackedVector2Array()
+var smoothed_polygon: PackedVector2Array = PackedVector2Array()
+var post_simp_polygon: PackedVector2Array = PackedVector2Array()
+var final_polygon: PackedVector2Array = PackedVector2Array()
+
+# Track which stages need recomputation (dirty flags)
+var dirty_stages: Dictionary = {
+	"contour": true,           # Needs contour extraction
+	"pre_simp": true,          # Needs pre-simplification
+	"smooth": true,            # Needs smoothing
+	"post_simp": true,         # Needs post-simplification
+	"self_intersect": true     # Needs self-intersection resolution
+}
 
 # Section collapse states (all collapsed by default)
 var section_states: Dictionary = {
@@ -95,6 +108,15 @@ func _ready():
 	_setup_preview()
 	_setup_collapsible_sections()
 	_connect_signals()
+
+# Mark a stage and all downstream stages as dirty
+func _mark_dirty(stage: String):
+	var stages_order = ["contour", "pre_simp", "smooth", "post_simp", "self_intersect"]
+	var stage_index = stages_order.find(stage)
+
+	if stage_index >= 0:
+		for i in range(stage_index, stages_order.size()):
+			dirty_stages[stages_order[i]] = true
 
 func _validate_ui_references() -> bool:
 	# Validate essential UI references are assigned
@@ -179,6 +201,7 @@ func _validate_ui_references() -> bool:
 func _setup_ui():
 	# Setup algorithm dropdowns
 	if contour_algorithm_option:
+		contour_algorithm_option.clear()
 		contour_algorithm_option.add_item("Moore Neighbour")
 		contour_algorithm_option.add_item("Marching Squares")
 		contour_algorithm_option.selected = 0
@@ -190,10 +213,12 @@ func _setup_ui():
 		pre_simp_algorithm_option.selected = 0
 
 	if smooth_algorithm_option:
+		smooth_algorithm_option.clear()
 		smooth_algorithm_option.add_item("Outward Smooth")
 		smooth_algorithm_option.selected = 0
 
 	if post_simp_algorithm_option:
+		post_simp_algorithm_option.clear()
 		post_simp_algorithm_option.add_item("Ramer-Douglas-Peucker")
 		post_simp_algorithm_option.add_item("Reumann-Witkam")
 		post_simp_algorithm_option.add_item("Visvalingam-Whyatt")
@@ -281,7 +306,7 @@ func _setup_collapsible_sections():
 
 	# Setup pre-simplification section
 	if pre_simp_section_button:
-		_style_section_button(pre_simp_section_button, "Pre-Simplification (Mandatory)", section_states["pre_simp"])
+		_style_section_button(pre_simp_section_button, "Pre-Simplification ()", section_states["pre_simp"])
 		pre_simp_section_button.pressed.connect(func(): _toggle_section("pre_simp"))
 	if pre_simp_section_content:
 		pre_simp_section_content.visible = section_states["pre_simp"]
@@ -289,7 +314,7 @@ func _setup_collapsible_sections():
 
 	# Setup smoothing section
 	if smooth_section_button:
-		_style_section_button(smooth_section_button, "Smoothing (Mandatory)", section_states["smooth"])
+		_style_section_button(smooth_section_button, "Smoothing ()", section_states["smooth"])
 		smooth_section_button.pressed.connect(func(): _toggle_section("smooth"))
 	if smooth_section_content:
 		smooth_section_content.visible = section_states["smooth"]
@@ -297,7 +322,7 @@ func _setup_collapsible_sections():
 
 	# Setup post-simplification section
 	if post_simp_section_button:
-		_style_section_button(post_simp_section_button, "Post-Simplification (Mandatory)", section_states["post_simp"])
+		_style_section_button(post_simp_section_button, "Post-Simplification ()", section_states["post_simp"])
 		post_simp_section_button.pressed.connect(func(): _toggle_section("post_simp"))
 	if post_simp_section_content:
 		post_simp_section_content.visible = section_states["post_simp"]
@@ -348,19 +373,19 @@ func _toggle_section(section_name: String):
 				contour_section_content.visible = is_expanded
 		"pre_simp":
 			if pre_simp_section_button:
-				pre_simp_section_button.text = arrow + "Pre-Simplification (Mandatory)"
+				pre_simp_section_button.text = arrow + "Pre-Simplification"
 				pre_simp_section_button.modulate = Color(0.95, 0.95, 0.95) if is_expanded else Color(0.85, 0.85, 0.85)
 			if pre_simp_section_content:
 				pre_simp_section_content.visible = is_expanded
 		"smooth":
 			if smooth_section_button:
-				smooth_section_button.text = arrow + "Smoothing (Mandatory)"
+				smooth_section_button.text = arrow + "Smoothing"
 				smooth_section_button.modulate = Color(0.95, 0.95, 0.95) if is_expanded else Color(0.85, 0.85, 0.85)
 			if smooth_section_content:
 				smooth_section_content.visible = is_expanded
 		"post_simp":
 			if post_simp_section_button:
-				post_simp_section_button.text = arrow + "Post-Simplification (Mandatory)"
+				post_simp_section_button.text = arrow + "Post-Simplification"
 				post_simp_section_button.modulate = Color(0.95, 0.95, 0.95) if is_expanded else Color(0.85, 0.85, 0.85)
 			if post_simp_section_content:
 				post_simp_section_content.visible = is_expanded
@@ -410,13 +435,13 @@ func _connect_signals():
 
 	# Connect algorithm changed signals
 	if contour_algorithm:
-		contour_algorithm.changed.connect(_run_pipeline)
+		contour_algorithm.changed.connect(func(): _mark_dirty("contour"); _run_pipeline())
 	if pre_simp_algorithm:
-		pre_simp_algorithm.changed.connect(_run_pipeline)
+		pre_simp_algorithm.changed.connect(func(): _mark_dirty("pre_simp"); _run_pipeline())
 	if smooth_algorithm:
-		smooth_algorithm.changed.connect(_run_pipeline)
+		smooth_algorithm.changed.connect(func(): _mark_dirty("smooth"); _run_pipeline())
 	if post_simp_algorithm:
-		post_simp_algorithm.changed.connect(_run_pipeline)
+		post_simp_algorithm.changed.connect(func(): _mark_dirty("post_simp"); _run_pipeline())
 
 func _on_image_selector_pressed():
 	var file_dialog = FileDialog.new()
@@ -452,6 +477,8 @@ func _load_image(path: String):
 		# Fit camera to image
 		_fit_camera_to_image()
 
+		# Mark entire pipeline as dirty (new image requires full reprocessing)
+		_mark_dirty("contour")
 		# Run pipeline
 		_run_pipeline()
 
@@ -474,26 +501,59 @@ func _run_pipeline():
 	if not current_image:
 		return
 
-	# Run contour extraction
-	var polygons = contour_algorithm.calculate_boundary(current_image)
-	if polygons.is_empty():
-		return
+	var polygon: PackedVector2Array
 
-	var polygon = polygons[0]  # Use first polygon
+	# Stage 1: Contour extraction
+	if dirty_stages["contour"]:
+		var polygons = contour_algorithm.calculate_boundary(current_image)
+		if polygons.is_empty():
+			return
+		contour_polygon = polygons[0]  # Use first polygon
+		dirty_stages["contour"] = false
+		polygon = contour_polygon
+	else:
+		polygon = contour_polygon
 
-	# Apply pre-simplification (mandatory)
-	if pre_simp_algorithm:
-		polygon = pre_simp_algorithm.simplify(polygon)
+	# Stage 2: Pre-simplification (mandatory)
+	if dirty_stages["pre_simp"]:
+		if pre_simp_algorithm:
+			pre_simp_polygon = pre_simp_algorithm.simplify(polygon)
+		else:
+			pre_simp_polygon = polygon
+		dirty_stages["pre_simp"] = false
+		polygon = pre_simp_polygon
+	else:
+		polygon = pre_simp_polygon
 
-	# Apply smoothing (mandatory)
-	if smooth_algorithm:
-		polygon = smooth_algorithm.smooth(polygon)
+	# Stage 3: Smoothing (mandatory)
+	if dirty_stages["smooth"]:
+		if smooth_algorithm:
+			smoothed_polygon = smooth_algorithm.smooth(polygon)
+		else:
+			smoothed_polygon = polygon
+		dirty_stages["smooth"] = false
+		polygon = smoothed_polygon
+	else:
+		polygon = smoothed_polygon
 
-	# Apply post-simplification (mandatory)
-	if post_simp_algorithm:
-		polygon = post_simp_algorithm.simplify(polygon)
+	# Stage 4: Post-simplification (mandatory)
+	if dirty_stages["post_simp"]:
+		if post_simp_algorithm:
+			post_simp_polygon = post_simp_algorithm.simplify(polygon)
+		else:
+			post_simp_polygon = polygon
+		dirty_stages["post_simp"] = false
+		polygon = post_simp_polygon
+	else:
+		polygon = post_simp_polygon
 
-	final_polygon = polygon
+	# Stage 5: Self-intersection resolution
+	if dirty_stages["self_intersect"]:
+		polygon = _resolve_self_intersections(polygon)
+		final_polygon = polygon
+		dirty_stages["self_intersect"] = false
+	else:
+		final_polygon = polygon
 
 	# Update preview
 	if polygon_preview:
@@ -502,6 +562,8 @@ func _run_pipeline():
 func _on_alpha_threshold_changed(value: float):
 	if contour_algorithm:
 		contour_algorithm.alpha_threshold = value
+	_mark_dirty("contour")
+	_run_pipeline()
 	_update_value_labels()
 
 func _on_contour_algorithm_changed(index: int):
@@ -515,7 +577,8 @@ func _on_contour_algorithm_changed(index: int):
 		contour_algorithm.alpha_threshold = alpha_threshold_slider.value
 	else:
 		contour_algorithm.alpha_threshold = 0.5  # Default value
-	contour_algorithm.changed.connect(_run_pipeline)
+	contour_algorithm.changed.connect(func(): _mark_dirty("contour"); _run_pipeline())
+	_mark_dirty("contour")
 	_run_pipeline()
 
 # Pre-simplification toggle removed - always enabled
@@ -530,8 +593,9 @@ func _on_pre_simp_algorithm_changed(index: int):
 		2:  # VW
 			pre_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_vw.gd").new()
 
-	pre_simp_algorithm.changed.connect(_run_pipeline)
+	pre_simp_algorithm.changed.connect(func(): _mark_dirty("pre_simp"); _run_pipeline())
 	_update_algorithm_params(pre_simp_params, pre_simp_algorithm)
+	_mark_dirty("pre_simp")
 	_run_pipeline()
 
 # Smoothing toggle removed - always enabled
@@ -543,8 +607,9 @@ func _on_smooth_algorithm_changed(index: int):
 			smooth_algorithm.smooth_strength = 0.5
 			smooth_algorithm.iterations = 1
 
-	smooth_algorithm.changed.connect(_run_pipeline)
+	smooth_algorithm.changed.connect(func(): _mark_dirty("smooth"); _run_pipeline())
 	_update_algorithm_params(smooth_params, smooth_algorithm)
+	_mark_dirty("smooth")
 	_run_pipeline()
 
 # Post-simplification toggle removed - always enabled
@@ -559,8 +624,9 @@ func _on_post_simp_algorithm_changed(index: int):
 		2:  # VW
 			post_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_vw.gd").new()
 
-	post_simp_algorithm.changed.connect(_run_pipeline)
+	post_simp_algorithm.changed.connect(func(): _mark_dirty("post_simp"); _run_pipeline())
 	_update_algorithm_params(post_simp_params, post_simp_algorithm)
+	_mark_dirty("post_simp")
 	_run_pipeline()
 
 func _update_algorithm_params(container: VBoxContainer, algorithm: Resource):
@@ -783,3 +849,10 @@ func _drop_data(_position: Vector2, data):
 		var files = data["files"]
 		if files.size() > 0:
 			_load_image(files[0])
+
+func _resolve_self_intersections(polygon: PackedVector2Array) -> PackedVector2Array:
+	# Use Godot's Geometry2D to merge polygons and resolve self-intersections
+	var merged_polygons = Geometry2D.merge_polygons(polygon, polygon)
+	if merged_polygons.size() > 0:
+		return merged_polygons[0]
+	return polygon

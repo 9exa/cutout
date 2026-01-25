@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://bdc537hr71e7k" path="res://addons/cutout/ui/cutout_dock.gd" id="1"]
 
-[node name="CutoutDock" type="VBoxContainer" node_paths=PackedStringArray("image_section", "image_section_button", "image_section_content", "image_selector_button", "image_path_label", "contour_section", "contour_section_button", "contour_section_content", "contour_algorithm_option", "alpha_threshold_slider", "alpha_threshold_value", "pre_simp_section", "pre_simp_section_button", "pre_simp_section_content", "pre_simp_algorithm_option", "pre_simp_params", "smooth_section", "smooth_section_button", "smooth_section_content", "smooth_algorithm_option", "smooth_params", "post_simp_section", "post_simp_section_button", "post_simp_section_content", "post_simp_algorithm_option", "post_simp_params", "preview_section", "preview_section_button", "preview_section_content", "preview_viewport", "preview_camera", "mesh_settings_section", "mesh_settings_button", "mesh_settings_content", "depth_slider", "depth_value", "mesh_width_spinbox", "mesh_height_spinbox", "export_section", "export_section_button", "export_section_content", "export_button", "export_path_line")]
+[node name="CutoutDock" type="VBoxContainer" node_paths=PackedStringArray("image_selector_button", "image_path_label", "contour_section", "contour_section_button", "contour_section_content", "contour_algorithm_option", "alpha_threshold_slider", "alpha_threshold_value", "pre_simp_section", "pre_simp_section_button", "pre_simp_section_content", "pre_simp_algorithm_option", "pre_simp_params", "smooth_section", "smooth_section_button", "smooth_section_content", "smooth_algorithm_option", "smooth_params", "post_simp_section", "post_simp_section_button", "post_simp_section_content", "post_simp_algorithm_option", "post_simp_params", "preview_viewport", "preview_camera", "mesh_settings_section", "mesh_settings_button", "mesh_settings_content", "depth_slider", "depth_value", "mesh_width_spinbox", "mesh_height_spinbox", "export_button", "export_path_line")]
 custom_minimum_size = Vector2(300, 600)
 anchors_preset = 15
 anchor_right = 1.0
@@ -97,15 +97,16 @@ text = "2. Pipeline Configuration"
 layout_mode = 2
 
 [node name="ContourSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection"]
-modulate = Color(0.95, 0.95, 0.95, 1)
+modulate = Color(0.85, 0.85, 0.85, 1)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "▼ Contour Extraction"
+text = "Contour Extraction"
 alignment = 0
 
 [node name="ContourSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection"]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -121,19 +122,11 @@ text = "Algorithm:"
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 selected = 0
-item_count = 6
+item_count = 2
 popup/item_0/text = "Moore Neighbour"
 popup/item_0/id = 0
 popup/item_1/text = "Marching Squares"
 popup/item_1/id = 1
-popup/item_2/text = "Moore Neighbour"
-popup/item_2/id = 2
-popup/item_3/text = "Marching Squares"
-popup/item_3/id = 3
-popup/item_4/text = "Moore Neighbour"
-popup/item_4/id = 4
-popup/item_5/text = "Marching Squares"
-popup/item_5/id = 5
 
 [node name="AlphaThreshold" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent"]
 layout_mode = 2
@@ -159,15 +152,16 @@ text = "0.50"
 layout_mode = 2
 
 [node name="PreSimpSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection"]
-modulate = Color(0.95, 0.95, 0.95, 1)
+modulate = Color(0.85, 0.85, 0.85, 1)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "▼ Pre-Simplification (Mandatory)"
+text = "Pre-Simplification"
 alignment = 0
 
 [node name="PreSimpSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection"]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -183,7 +177,7 @@ text = "Algorithm:"
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 selected = 0
-item_count = 9
+item_count = 12
 popup/item_0/text = "Ramer-Douglas-Peucker"
 popup/item_0/id = 0
 popup/item_1/text = "Reumann-Witkam"
@@ -202,6 +196,12 @@ popup/item_7/text = "Reumann-Witkam"
 popup/item_7/id = 7
 popup/item_8/text = "Visvalingam-Whyatt"
 popup/item_8/id = 8
+popup/item_9/text = "Ramer-Douglas-Peucker"
+popup/item_9/id = 9
+popup/item_10/text = "Reumann-Witkam"
+popup/item_10/id = 10
+popup/item_11/text = "Visvalingam-Whyatt"
+popup/item_11/id = 11
 
 [node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent"]
 layout_mode = 2
@@ -210,15 +210,16 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="SmoothSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection"]
-modulate = Color(0.95, 0.95, 0.95, 1)
+modulate = Color(0.85, 0.85, 0.85, 1)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "▼ Smoothing (Mandatory)"
+text = "Smoothing"
 alignment = 0
 
 [node name="SmoothSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection"]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -234,13 +235,9 @@ text = "Algorithm:"
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 selected = 0
-item_count = 3
+item_count = 1
 popup/item_0/text = "Outward Smooth"
 popup/item_0/id = 0
-popup/item_1/text = "Outward Smooth"
-popup/item_1/id = 1
-popup/item_2/text = "Outward Smooth"
-popup/item_2/id = 2
 
 [node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent"]
 layout_mode = 2
@@ -249,15 +246,16 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="PostSimpSectionButton" type="Button" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection"]
-modulate = Color(0.95, 0.95, 0.95, 1)
+modulate = Color(0.85, 0.85, 0.85, 1)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "▼ Post-Simplification (Mandatory)"
+text = "Post-Simplification"
 alignment = 0
 
 [node name="PostSimpSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection"]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -273,25 +271,13 @@ text = "Algorithm:"
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 selected = 0
-item_count = 9
+item_count = 3
 popup/item_0/text = "Ramer-Douglas-Peucker"
 popup/item_0/id = 0
 popup/item_1/text = "Reumann-Witkam"
 popup/item_1/id = 1
 popup/item_2/text = "Visvalingam-Whyatt"
 popup/item_2/id = 2
-popup/item_3/text = "Ramer-Douglas-Peucker"
-popup/item_3/id = 3
-popup/item_4/text = "Reumann-Witkam"
-popup/item_4/id = 4
-popup/item_5/text = "Visvalingam-Whyatt"
-popup/item_5/id = 5
-popup/item_6/text = "Ramer-Douglas-Peucker"
-popup/item_6/id = 6
-popup/item_7/text = "Reumann-Witkam"
-popup/item_7/id = 7
-popup/item_8/text = "Visvalingam-Whyatt"
-popup/item_8/id = 8
 
 [node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent"]
 layout_mode = 2
@@ -303,15 +289,16 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="MeshSettingsButton" type="Button" parent="HBoxContainer/VBoxContainer/MeshSettings"]
-modulate = Color(0.95, 0.95, 0.95, 1)
+modulate = Color(0.85, 0.85, 0.85, 1)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "▼ Mesh Settings"
+text = "Mesh Settings"
 alignment = 0
 
 [node name="MeshSettingsContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/MeshSettings"]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 

@@ -1,199 +1,114 @@
-class_name ContourUtils
+class_name CutoutGeometryUtils
 extends RefCounted
 
-## Utility class for contour extraction, simplification, and triangulation
+## Utility class for polygon triangulation and geometric testing
 ## All methods are static for easy reuse across different scripts
-
-# Moore neighborhood contour following algorithm
-static func extract_contour(image: Image, alpha_threshold: float = 0.5) -> PackedVector2Array:
-	var width := image.get_width()
-	var height := image.get_height()
-
-	# Decompress if needed
-	if image.is_compressed():
-		image = image.duplicate()
-		image.decompress()
-
-	# Find the topmost-leftmost opaque pixel as starting point
-	var start_pixel := Vector2i(-1, -1)
-	for y in range(height):
-		for x in range(width):
-			if image.get_pixel(x, y).a >= alpha_threshold:
-				# Check if this is an edge pixel
-				var is_edge := false
-				if x == 0 or image.get_pixel(x-1, y).a < alpha_threshold:
-					is_edge = true
-				elif y == 0 or image.get_pixel(x, y-1).a < alpha_threshold:
-					is_edge = true
-
-				if is_edge:
-					start_pixel = Vector2i(x, y)
-					break
-		if start_pixel.x != -1:
-			break
-
-	if start_pixel.x == -1:
-		return PackedVector2Array()
-
-	# Moore neighborhood directions (clockwise from west)
-	var directions := [
-		Vector2i(-1, 0),  # 0: W
-		Vector2i(-1, -1), # 1: NW
-		Vector2i(0, -1),  # 2: N
-		Vector2i(1, -1),  # 3: NE
-		Vector2i(1, 0),   # 4: E
-		Vector2i(1, 1),   # 5: SE
-		Vector2i(0, 1),   # 6: S
-		Vector2i(-1, 1)   # 7: SW
-	]
-
-	var contour := PackedVector2Array()
-	var current := start_pixel
-	var entered_from := 0  # Initially entered from west
-	var contour_started := false
-
-	# Helper function to check if pixel is opaque and in bounds
-	var is_solid = func(p: Vector2i) -> bool:
-		if p.x < 0 or p.x >= width or p.y < 0 or p.y >= height:
-			return false
-		return image.get_pixel(p.x, p.y).a >= alpha_threshold
-
-	# Main contour tracing loop
-	var max_points := width * height * 2  # Safety limit
-	while contour.size() < max_points:
-		# Add current pixel to contour
-		if not contour_started or current != start_pixel:
-			contour.append(Vector2(current))
-			contour_started = true
-
-		# Start checking from the direction we entered + 2 (90 degrees right)
-		var check_start := (entered_from + 2) % 8
-		var next_pixel := Vector2i(-1, -1)
-		var next_dir := -1
-
-		# Check all 8 directions starting from check_start
-		for i in range(8):
-			var dir: int = (check_start + i) % 8
-			var neighbor: Vector2i = current + directions[dir]
-
-			if is_solid.call(neighbor):
-				next_pixel = neighbor
-				next_dir = dir
-				break
-
-		# If we found a next pixel
-		if next_pixel.x != -1:
-			# If we've returned to start and have traced enough
-			if next_pixel == start_pixel and contour.size() > 2:
-				break
-
-			current = next_pixel
-			# The direction we entered the new pixel from (opposite of direction we moved)
-			entered_from = (next_dir + 4) % 8
-		else:
-			# Isolated pixel
-			break
-
-	return contour
-
-# Douglas-Peucker polygon simplification
-static func simplify_polygon(points: PackedVector2Array, threshold: float) -> PackedVector2Array:
-	if points.size() < 3:
-		return points
-
-	# Find the point with maximum distance from the line between first and last
-	var max_dist := 0.0
-	var max_index := 0
-
-	for i in range(1, points.size() - 1):
-		var dist := point_to_line_distance(points[i], points[0], points[points.size() - 1])
-		if dist > max_dist:
-			max_dist = dist
-			max_index = i
-
-	# If max distance is greater than threshold, recursively simplify
-	if max_dist > threshold:
-		# Recursively simplify both segments
-		var left_segment := points.slice(0, max_index + 1)
-		var right_segment := points.slice(max_index)
-
-		var left_simplified := simplify_polygon(left_segment, threshold)
-		var right_simplified := simplify_polygon(right_segment, threshold)
-
-		# Combine results (remove duplicate middle point)
-		var result := PackedVector2Array()
-		for i in range(left_simplified.size() - 1):
-			result.append(left_simplified[i])
-		for point in right_simplified:
-			result.append(point)
-
-		return result
-	else:
-		# Return just the endpoints
-		return PackedVector2Array([points[0], points[points.size() - 1]])
 
 # Triangulate polygon with multiple fallback methods for robustness
 static func triangulate_with_fallbacks(points: PackedVector2Array) -> PackedInt32Array:
 	if points.size() < 3:
-		print("[ContourUtils] Triangulation skipped: polygon has less than 3 points")
+		print("[CutoutGeometryUtils] Triangulation skipped: polygon has less than 3 points")
 		return PackedInt32Array()
 
 	# Initial state logging
 	var area := compute_polygon_area(points)
 	var is_clockwise := area < 0
-	print("[ContourUtils] Starting triangulation for polygon with ", points.size(), " points")
-	print("[ContourUtils] Area: ", area, ", Winding: ", "CW" if is_clockwise else "CCW")
+	print("[CutoutGeometryUtils] Starting triangulation for polygon with ", points.size(), " points")
+	print("[CutoutGeometryUtils] Area: ", area, ", Winding: ", "CW" if is_clockwise else "CCW")
 
 	# Method 1: Godot's triangulate_polygon expects CCW winding
 	# Incoming points are already CCW after Y-flip in CutoutMesh, so use them directly
-	print("[ContourUtils] Method 1: Attempting Godot triangulator (trusting incoming winding)")
+	print("[CutoutGeometryUtils] Method 1: Attempting Godot triangulator (trusting incoming winding)")
 
 	var triangles := Geometry2D.triangulate_polygon(points)
 	if not triangles.is_empty():
-		print("[ContourUtils] Method 1: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+		print("[CutoutGeometryUtils] Method 1: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 		return triangles
-	print("[ContourUtils] Method 1: FAILED - returned empty")
+	print("[CutoutGeometryUtils] Method 1: FAILED - returned empty")
 
 	# Method 2: Try the opposite winding if first attempt failed
-	print("[ContourUtils] Method 2: Attempting opposite winding")
+	print("[CutoutGeometryUtils] Method 2: Attempting opposite winding")
 	var opposite_points := PackedVector2Array()
 	for i in range(points.size() - 1, -1, -1):
 		opposite_points.append(points[i])
 	triangles = Geometry2D.triangulate_polygon(opposite_points)
 	if not triangles.is_empty():
-		print("[ContourUtils] Method 2: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+		print("[CutoutGeometryUtils] Method 2: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 		return triangles
-	print("[ContourUtils] Method 2: FAILED - returned empty")
+	print("[CutoutGeometryUtils] Method 2: FAILED - returned empty")
 
 	# Method 3: Try removing duplicate/degenerate vertices
-	print("[ContourUtils] Method 3: Cleaning degenerate vertices")
+	print("[CutoutGeometryUtils] Method 3: Cleaning degenerate vertices")
 	var cleaned := clean_polygon(points)
 	var removed_count := points.size() - cleaned.size()
-	print("[ContourUtils] Method 3: Removed ", removed_count, " vertices (", cleaned.size(), " remaining)")
+	print("[CutoutGeometryUtils] Method 3: Removed ", removed_count, " vertices (", cleaned.size(), " remaining)")
 	if cleaned.size() >= 3:
 		triangles = Geometry2D.triangulate_polygon(cleaned)
 		if not triangles.is_empty():
-			print("[ContourUtils] Method 3: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+			print("[CutoutGeometryUtils] Method 3: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 			return triangles
-	print("[ContourUtils] Method 3: FAILED - returned empty")
+	print("[CutoutGeometryUtils] Method 3: FAILED - returned empty")
 
 	# Method 4: Fallback to ear clipping algorithm
-	print("[ContourUtils] Method 4: Attempting custom ear clipping")
+	print("[CutoutGeometryUtils] Method 4: Attempting custom ear clipping")
 	triangles = ear_clipping_triangulation(points)
 	if not triangles.is_empty():
-		print("[ContourUtils] Method 4: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+		print("[CutoutGeometryUtils] Method 4: SUCCESS - Generated ", triangles.size() / 3, " triangles")
 		return triangles
-	print("[ContourUtils] Method 4: FAILED - ear clipping failed")
+	print("[CutoutGeometryUtils] Method 4: FAILED - ear clipping failed")
 
 	# Method 5: Last resort - use convex hull
-	push_warning("[ContourUtils] ⚠️ WARNING: Method 5 - Using CONVEX HULL fallback")
-	push_warning("[ContourUtils] ⚠️ This will create triangles OUTSIDE the polygon boundary!")
-	print("[ContourUtils] Method 5: Generating convex hull")
+	push_warning("[CutoutGeometryUtils] ⚠️ WARNING: Method 5 - Using CONVEX HULL fallback")
+	push_warning("[CutoutGeometryUtils] ⚠️ This will create triangles OUTSIDE the polygon boundary!")
+	print("[CutoutGeometryUtils] Method 5: Generating convex hull")
 	var hull := Geometry2D.convex_hull(points)
-	print("[ContourUtils] Method 5: Hull has ", hull.size(), " points (original had ", points.size(), " points)")
+	print("[CutoutGeometryUtils] Method 5: Hull has ", hull.size(), " points (original had ", points.size(), " points)")
 	triangles = Geometry2D.triangulate_polygon(hull)
-	print("[ContourUtils] Method 5: Generated ", triangles.size() / 3, " triangles from convex hull")
+	print("[CutoutGeometryUtils] Method 5: Generated ", triangles.size() / 3, " triangles from convex hull")
 	return triangles
+
+# Test if polygon has self-intersecting edges
+static func has_self_intersections(polygon: PackedVector2Array) -> bool:
+	"""Check if polygon has self-intersecting edges (non-simple polygon)."""
+	if polygon.size() < 4:
+		return false
+
+	var n = polygon.size()
+
+	# Check each edge against non-adjacent edges
+	for i in range(n):
+		var p1 = polygon[i]
+		var p2 = polygon[(i + 1) % n]
+
+		# Skip adjacent edges
+		for j in range(i + 2, n):
+			if j == (i + n - 1) % n:  # Skip adjacent edges
+				continue
+
+			var p3 = polygon[j]
+			var p4 = polygon[(j + 1) % n]
+
+			if _segments_intersect(p1, p2, p3, p4):
+				print("[CutoutGeometryUtils] Self-intersection detected between edges ", i, " and ", j)
+				return true
+
+	return false
+
+# Test if two line segments intersect (excluding endpoints)
+static func _segments_intersect(p1: Vector2, p2: Vector2, p3: Vector2, p4: Vector2) -> bool:
+	"""Check if two line segments intersect (excluding endpoints)."""
+	var d1 = _ccw(p1, p3, p4)
+	var d2 = _ccw(p2, p3, p4)
+	var d3 = _ccw(p1, p2, p3)
+	var d4 = _ccw(p1, p2, p4)
+
+	return ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
+	       ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0))
+
+# Counter-clockwise test using cross product
+static func _ccw(a: Vector2, b: Vector2, c: Vector2) -> float:
+	"""Counter-clockwise test (cross product). Positive = CCW turn, negative = CW turn."""
+	return (c.y - a.y) * (b.x - a.x) - (b.y - a.y) * (c.x - a.x)
 
 # Remove duplicate and degenerate vertices from polygon
 static func clean_polygon(points: PackedVector2Array) -> PackedVector2Array:
