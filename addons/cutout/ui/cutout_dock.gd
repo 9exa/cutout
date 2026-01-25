@@ -45,6 +45,8 @@ signal cutout_mesh_created(mesh: CutoutMesh)
 @export_group("Preview")
 @export var preview_viewport: SubViewport
 @export var preview_camera: Camera2D
+# Polygon preview instance
+@export var polygon_preview: Node2D
 
 ## Mesh Settings Controls
 @export_group("Mesh Settings")
@@ -69,9 +71,6 @@ var contour_algorithm: CutoutContourAlgorithm
 var pre_simp_algorithm: CutoutPolysimpAlgorithm
 var smooth_algorithm: CutoutSmoothAlgorithm
 var post_simp_algorithm: CutoutPolysimpAlgorithm
-
-# Polygon preview instance
-var polygon_preview: Node2D
 
 # Pipeline results - intermediate polygons for incremental computation
 var contour_polygon: PackedVector2Array = PackedVector2Array()
@@ -105,7 +104,6 @@ func _ready():
 
 	_setup_ui()
 	_setup_algorithms()
-	_setup_preview()
 	_setup_collapsible_sections()
 	_connect_signals()
 
@@ -207,6 +205,7 @@ func _setup_ui():
 		contour_algorithm_option.selected = 0
 
 	if pre_simp_algorithm_option:
+		pre_simp_algorithm_option.clear()
 		pre_simp_algorithm_option.add_item("Ramer-Douglas-Peucker")
 		pre_simp_algorithm_option.add_item("Reumann-Witkam")
 		pre_simp_algorithm_option.add_item("Visvalingam-Whyatt")
@@ -288,17 +287,10 @@ func _initialize_parameter_ui():
 	if post_simp_params and post_simp_algorithm:
 		_update_algorithm_params(post_simp_params, post_simp_algorithm)
 
-func _setup_preview():
-	# Create the polygon preview node
-	polygon_preview = preload("res://addons/cutout/ui/polygon_preview.gd").new()
-	polygon_preview.name = "PolygonPreview"
-	if preview_viewport:
-		preview_viewport.add_child(polygon_preview)
-
 func _setup_collapsible_sections():
 	# Setup contour section
 	if contour_section_button:
-		_style_section_button(contour_section_button, "Contour Extraction", section_states["contour"])
+		_style_section_button(contour_section_button, "▶ Contour Extraction", section_states["contour"])
 		contour_section_button.pressed.connect(func(): _toggle_section("contour"))
 	if contour_section_content:
 		contour_section_content.visible = section_states["contour"]
@@ -306,7 +298,7 @@ func _setup_collapsible_sections():
 
 	# Setup pre-simplification section
 	if pre_simp_section_button:
-		_style_section_button(pre_simp_section_button, "Pre-Simplification ()", section_states["pre_simp"])
+		_style_section_button(pre_simp_section_button, "▶ Pre-Simplification", section_states["pre_simp"])
 		pre_simp_section_button.pressed.connect(func(): _toggle_section("pre_simp"))
 	if pre_simp_section_content:
 		pre_simp_section_content.visible = section_states["pre_simp"]
@@ -314,7 +306,7 @@ func _setup_collapsible_sections():
 
 	# Setup smoothing section
 	if smooth_section_button:
-		_style_section_button(smooth_section_button, "Smoothing ()", section_states["smooth"])
+		_style_section_button(smooth_section_button, "▶ Smoothing", section_states["smooth"])
 		smooth_section_button.pressed.connect(func(): _toggle_section("smooth"))
 	if smooth_section_content:
 		smooth_section_content.visible = section_states["smooth"]
@@ -322,7 +314,7 @@ func _setup_collapsible_sections():
 
 	# Setup post-simplification section
 	if post_simp_section_button:
-		_style_section_button(post_simp_section_button, "Post-Simplification ()", section_states["post_simp"])
+		_style_section_button(post_simp_section_button, "▶ Post-Simplification", section_states["post_simp"])
 		post_simp_section_button.pressed.connect(func(): _toggle_section("post_simp"))
 	if post_simp_section_content:
 		post_simp_section_content.visible = section_states["post_simp"]
@@ -330,7 +322,7 @@ func _setup_collapsible_sections():
 
 	# Setup mesh settings section
 	if mesh_settings_button:
-		_style_section_button(mesh_settings_button, "Mesh Settings", section_states["mesh_settings"])
+		_style_section_button(mesh_settings_button, "▶ Mesh Settings", section_states["mesh_settings"])
 		mesh_settings_button.pressed.connect(func(): _toggle_section("mesh_settings"))
 	if mesh_settings_content:
 		mesh_settings_content.visible = section_states["mesh_settings"]

@@ -4,9 +4,13 @@ extends Node3D
 
 ## 3D display node for CutoutMesh resources.
 ##
-## This node renders a CutoutMesh resource and allows per-instance customization
-## of materials (side color, extrusion texture). Multiple instances can share
-## the same CutoutMesh resource for efficient memory usage and performance.
+## This node renders a CutoutMesh resource and supports per-instance material customization
+## via optional material overrides. Multiple instances can share the same CutoutMesh resource
+## for efficient memory usage and performance.
+##
+## By default, uses auto-generated materials from CutoutMesh (based on texture and extrusion_texture).
+## For advanced use cases (custom shaders, animations, special effects), you can override materials
+## per-instance using [member override_face_material] and [member override_extrusion_material].
 ##
 ## The actual mesh rendering is handled by an internal MeshInstance3D child node,
 ## keeping the implementation details encapsulated.
@@ -26,6 +30,51 @@ extends Node3D
 		if cutout_mesh:
 			cutout_mesh.changed.connect(_on_cutout_mesh_changed)
 			_update_mesh()
+
+## Optional material override for front and back faces (Surface 0).
+## If set, this material replaces the auto-generated face material from CutoutMesh.
+## The face surface uses standard UV mapping (0-1 range) from the texture.
+##
+## Background Material Example:
+## To show a background material where texture alpha is 0 or texture is null,
+## use the included shader: res://addons/cutout/shaders/cutout_background_composite.tres
+##   1. Duplicate the shader material resource
+##   2. Set 'foreground_texture' to your main texture
+##   3. Set 'background_color' or enable 'use_background_texture' with 'background_texture'
+##   4. Assign the material to this property
+##
+## Set to null to revert to the auto-generated material.
+@export var override_face_material: Material:
+	set(value):
+		override_face_material = value
+		if is_node_ready():
+			_update_materials()
+
+## Optional material override for extrusion side walls (Surface 1).
+## If set, this material replaces the auto-generated extrusion material from CutoutMesh.
+##
+## UV Coordinates for custom shaders:
+##   UV.x: Distance along perimeter (0.0 to perimeter_length * extrusion_texture_scale)
+##         - Exceeds 1.0 to enable seamless tiling around irregular shapes
+##         - Use fract(UV.x) to normalize to 0-1 range if needed
+##   UV.y: Depth position (0.0 = front face, 1.0 = back face)
+##         - Always in 0-1 range
+##
+## Example shader for scrolling animation:
+##   shader_type spatial;
+##   uniform sampler2D my_texture;
+##   void fragment() {
+##       vec2 uv = UV;
+##       uv.x += TIME * 0.5;  // Scroll along perimeter
+##       ALBEDO = texture(my_texture, uv).rgb;
+##   }
+##
+## Set to null to revert to the auto-generated material.
+@export var override_extrusion_material: Material:
+	set(value):
+		override_extrusion_material = value
+		if is_node_ready():
+			_update_materials()
 
 ## Internal mesh instance for rendering
 var _mesh_instance: MeshInstance3D
@@ -83,12 +132,20 @@ func _update_materials() -> void:
 	if mesh.get_surface_count() < 1:
 		return
 
-	# Use shared material from CutoutMesh for surface 0 (faces)
-	_mesh_instance.set_surface_override_material(0, cutout_mesh.get_face_material())
+	# Surface 0: Front and back faces
+	# Use override if provided, otherwise use shared material from CutoutMesh
+	if override_face_material:
+		_mesh_instance.set_surface_override_material(0, override_face_material)
+	else:
+		_mesh_instance.set_surface_override_material(0, cutout_mesh.get_face_material())
 
-	# Use shared material from CutoutMesh for surface 1 (sides)
+	# Surface 1: Extrusion side walls
+	# Use override if provided, otherwise use shared material from CutoutMesh
 	if mesh.get_surface_count() >= 2:
-		_mesh_instance.set_surface_override_material(1, cutout_mesh.get_side_material())
+		if override_extrusion_material:
+			_mesh_instance.set_surface_override_material(1, override_extrusion_material)
+		else:
+			_mesh_instance.set_surface_override_material(1, cutout_mesh.get_side_material())
 
 
 func _on_cutout_mesh_changed() -> void:

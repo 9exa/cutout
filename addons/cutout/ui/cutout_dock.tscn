@@ -1,15 +1,13 @@
-[gd_scene load_steps=2 format=3 uid="uid://bqxvqn7jdyxvl"]
+[gd_scene load_steps=3 format=3 uid="uid://bqxvqn7jdyxvl"]
 
 [ext_resource type="Script" uid="uid://bdc537hr71e7k" path="res://addons/cutout/ui/cutout_dock.gd" id="1"]
+[ext_resource type="Script" uid="uid://bngtnfq0t4qwk" path="res://addons/cutout/ui/polygon_preview.gd" id="2_w6wls"]
 
-[node name="CutoutDock" type="VBoxContainer" node_paths=PackedStringArray("image_selector_button", "image_path_label", "contour_section", "contour_section_button", "contour_section_content", "contour_algorithm_option", "alpha_threshold_slider", "alpha_threshold_value", "pre_simp_section", "pre_simp_section_button", "pre_simp_section_content", "pre_simp_algorithm_option", "pre_simp_params", "smooth_section", "smooth_section_button", "smooth_section_content", "smooth_algorithm_option", "smooth_params", "post_simp_section", "post_simp_section_button", "post_simp_section_content", "post_simp_algorithm_option", "post_simp_params", "preview_viewport", "preview_camera", "mesh_settings_section", "mesh_settings_button", "mesh_settings_content", "depth_slider", "depth_value", "mesh_width_spinbox", "mesh_height_spinbox", "export_button", "export_path_line")]
-custom_minimum_size = Vector2(300, 600)
-anchors_preset = 15
+[node name="CutoutDock" type="VBoxContainer" node_paths=PackedStringArray("image_selector_button", "image_path_label", "contour_section", "contour_section_button", "contour_section_content", "contour_algorithm_option", "alpha_threshold_slider", "alpha_threshold_value", "pre_simp_section", "pre_simp_section_button", "pre_simp_section_content", "pre_simp_algorithm_option", "pre_simp_params", "smooth_section", "smooth_section_button", "smooth_section_content", "smooth_algorithm_option", "smooth_params", "post_simp_section", "post_simp_section_button", "post_simp_section_content", "post_simp_algorithm_option", "post_simp_params", "preview_viewport", "preview_camera", "polygon_preview", "mesh_settings_section", "mesh_settings_button", "mesh_settings_content", "depth_slider", "depth_value", "mesh_width_spinbox", "mesh_height_spinbox", "export_button", "export_path_line")]
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_bottom = 310.0
+offset_bottom = 454.0
 grow_horizontal = 2
-grow_vertical = 2
 script = ExtResource("1")
 image_selector_button = NodePath("HBoxContainer/VBoxContainer/ImageSection/ImageSelector")
 image_path_label = NodePath("HBoxContainer/VBoxContainer/ImageSection/ImagePath")
@@ -36,6 +34,7 @@ post_simp_algorithm_option = NodePath("HBoxContainer/VBoxContainer/PipelineSecti
 post_simp_params = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent/Parameters")
 preview_viewport = NodePath("HBoxContainer/PreviewSection/ViewportContainer/SubViewport")
 preview_camera = NodePath("HBoxContainer/PreviewSection/ViewportContainer/SubViewport/Camera2D")
+polygon_preview = NodePath("HBoxContainer/PreviewSection/ViewportContainer/SubViewport/PolygonPreview2D")
 mesh_settings_section = NodePath("HBoxContainer/VBoxContainer/MeshSettings")
 mesh_settings_button = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsButton")
 mesh_settings_content = NodePath("HBoxContainer/VBoxContainer/MeshSettings/MeshSettingsContent")
@@ -102,7 +101,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "Contour Extraction"
+text = "▶ Contour Extraction"
 alignment = 0
 
 [node name="ContourSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection"]
@@ -157,7 +156,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "Pre-Simplification"
+text = "▶ Pre-Simplification"
 alignment = 0
 
 [node name="PreSimpSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection"]
@@ -177,31 +176,13 @@ text = "Algorithm:"
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 selected = 0
-item_count = 12
+item_count = 3
 popup/item_0/text = "Ramer-Douglas-Peucker"
 popup/item_0/id = 0
 popup/item_1/text = "Reumann-Witkam"
 popup/item_1/id = 1
 popup/item_2/text = "Visvalingam-Whyatt"
 popup/item_2/id = 2
-popup/item_3/text = "Ramer-Douglas-Peucker"
-popup/item_3/id = 3
-popup/item_4/text = "Reumann-Witkam"
-popup/item_4/id = 4
-popup/item_5/text = "Visvalingam-Whyatt"
-popup/item_5/id = 5
-popup/item_6/text = "Ramer-Douglas-Peucker"
-popup/item_6/id = 6
-popup/item_7/text = "Reumann-Witkam"
-popup/item_7/id = 7
-popup/item_8/text = "Visvalingam-Whyatt"
-popup/item_8/id = 8
-popup/item_9/text = "Ramer-Douglas-Peucker"
-popup/item_9/id = 9
-popup/item_10/text = "Reumann-Witkam"
-popup/item_10/id = 10
-popup/item_11/text = "Visvalingam-Whyatt"
-popup/item_11/id = 11
 
 [node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent"]
 layout_mode = 2
@@ -215,7 +196,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "Smoothing"
+text = "▶ Smoothing"
 alignment = 0
 
 [node name="SmoothSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection"]
@@ -251,7 +232,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "Post-Simplification"
+text = "▶ Post-Simplification"
 alignment = 0
 
 [node name="PostSimpSectionContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection"]
@@ -294,7 +275,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.9, 0.9, 1)
 theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "Mesh Settings"
+text = "▶ Mesh Settings"
 alignment = 0
 
 [node name="MeshSettingsContent" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/MeshSettings"]
@@ -393,15 +374,21 @@ theme_override_font_sizes/font_size = 14
 text = "3. Preview"
 
 [node name="ViewportContainer" type="SubViewportContainer" parent="HBoxContainer/PreviewSection"]
-custom_minimum_size = Vector2(200, 200)
 layout_mode = 2
 size_flags_vertical = 3
 stretch = true
 
 [node name="SubViewport" type="SubViewport" parent="HBoxContainer/PreviewSection/ViewportContainer"]
 handle_input_locally = false
-size = Vector2i(574, 896)
+size = Vector2i(574, 392)
 render_target_update_mode = 4
+
+[node name="PolygonPreview2D" type="Node2D" parent="HBoxContainer/PreviewSection/ViewportContainer/SubViewport"]
+script = ExtResource("2_w6wls")
 
 [node name="Camera2D" type="Camera2D" parent="HBoxContainer/PreviewSection/ViewportContainer/SubViewport"]
 position = Vector2(100, 100)
+
+[node name="PolygonPreview3D" type="Node3D" parent="HBoxContainer/PreviewSection/ViewportContainer/SubViewport"]
+
+[node name="Camera3D" type="Camera3D" parent="HBoxContainer/PreviewSection/ViewportContainer/SubViewport"]

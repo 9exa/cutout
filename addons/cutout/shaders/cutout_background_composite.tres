@@ -1,0 +1,10 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://addons/cutout/shaders/cutout_background_composite.gdshader" id="1_shader"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/background_color = Color(1, 1, 1, 1)
+shader_parameter/use_background_texture = false
+shader_parameter/alpha_scissor = 0.0
