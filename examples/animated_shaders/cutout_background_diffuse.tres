@@ -1,6 +1,6 @@
 [gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://cbmibe7d1h5jn"]
 
-[ext_resource type="Shader" uid="uid://duev3r5g3dvvk" path="res://tests/animated_shaders/test_cutout_background_diffuse.gdshader" id="1_pj4ed"]
+[ext_resource type="Shader" uid="uid://duev3r5g3dvvk" path="res://examples/animated_shaders/cutout_background_diffuse.gdshader" id="1_pj4ed"]
 [ext_resource type="Texture2D" uid="uid://0c8c47e6fuxo" path="res://siobhan.png" id="2_fo47o"]
 
 [resource]

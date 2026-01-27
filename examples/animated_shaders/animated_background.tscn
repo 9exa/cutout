@@ -1,9 +1,9 @@
 [gd_scene load_steps=7 format=4 uid="uid://bo7jo8pta4b13"]
 
 [ext_resource type="Script" uid="uid://bgbcnqyyqy8so" path="res://addons/cutout/nodes/cutout_mesh_instance_3d.gd" id="1_0wgam"]
-[ext_resource type="Resource" uid="uid://dgb8jx5ayapf" path="res://siobhan_cutout.tres" id="2_dcdnr"]
-[ext_resource type="Material" uid="uid://cbmibe7d1h5jn" path="res://tests/animated_shaders/test_cutout_background_diffuse.tres" id="3_0wgam"]
-[ext_resource type="Shader" uid="uid://dqn4d5dbn6fxn" path="res://tests/animated_shaders/test_animated_background_extrusion.gdshader" id="4_dcdnr"]
+[ext_resource type="Resource" path="res://siobhan_cutout.tres" id="2_dcdnr"]
+[ext_resource type="Material" uid="uid://cbmibe7d1h5jn" path="res://examples/animated_shaders/cutout_background_diffuse.tres" id="3_0wgam"]
+[ext_resource type="Shader" uid="uid://dqn4d5dbn6fxn" path="res://examples/animated_shaders/animated_background_extrusion.gdshader" id="4_dcdnr"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_ev4o3"]
 render_priority = 0

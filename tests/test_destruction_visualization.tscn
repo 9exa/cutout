@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://b5arcgujyts47"]
+
+[ext_resource type="Script" uid="uid://or26prdqpnfp" path="res://tests/destruction_visualizer.gd" id="1_destruction"]
+[ext_resource type="Script" uid="uid://bvb31c1uw65q1" path="res://addons/cutout/resources/destruction/cutout_destruction_voronoi.gd" id="2_voronoi"]
+
+[sub_resource type="Resource" id="Resource_voronoi"]
+script = ExtResource("2_voronoi")
+pattern = 3
+_impact_point = Vector2(0, 0)
+_ring_count = 6
+_ring_size = 10.0
+_points_per_ring = 3
+_radial_variation = 0.26
+seed = 12225
+fragment_count = 15
+
+[node name="DestructionVisualizer" type="Node2D"]
+script = ExtResource("1_destruction")
+polygon_preset = 2
+destruction_algorithm = SubResource("Resource_voronoi")
