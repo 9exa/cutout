@@ -85,6 +85,10 @@ func _ready() -> void:
 	if cutout_mesh:
 		_update_mesh()
 
+func get_mesh_instance() -> MeshInstance3D:
+	if not _mesh_instance:
+		_setup_mesh_instance()
+	return _mesh_instance
 
 func _setup_mesh_instance() -> void:
 	# Try to find existing internal MeshInstance3D child first

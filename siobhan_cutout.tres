@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="CutoutMesh" load_steps=3 format=3 uid="uid://dgb8jx5ayapf"]
 
 [ext_resource type="Script" uid="uid://cdqbomcwoseit" path="res://addons/cutout/resources/cutout_mesh.gd" id="1_um4y3"]
-[ext_resource type="Texture2D" uid="uid://0c8c47e6fuxo" path="res://siobhan.png" id="2_32mal"]
+[ext_resource type="Texture2D" path="res://siobhan.png" id="2_32mal"]
 
 [resource]
 script = ExtResource("1_um4y3")

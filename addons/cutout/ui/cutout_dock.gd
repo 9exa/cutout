@@ -462,6 +462,15 @@ func _load_image(path: String):
 		if image_path_label:
 			image_path_label.text = path.get_file()
 
+		# Calculate and set mesh size based on aspect ratio
+		if current_image and mesh_width_spinbox and mesh_height_spinbox:
+			var img_width: float = current_image.get_width()
+			var img_height: float = current_image.get_height()
+			if img_width > 0:
+				var aspect_ratio: float = img_height / img_width
+				mesh_width_spinbox.value = 1.0
+				mesh_height_spinbox.value = aspect_ratio
+
 		# Update preview
 		if polygon_preview:
 			polygon_preview.set_texture(current_texture)
@@ -805,8 +814,8 @@ func _on_export_pressed():
 			export_path_line.text = save_path
 			export_path_line.tooltip_text = save_path
 
-		# Save the resource
-		var error = ResourceSaver.save(cutout_mesh, save_path)
+		# Save the resource with explicit flags to ensure overwriting works
+		var error = ResourceSaver.save(cutout_mesh, save_path, ResourceSaver.FLAG_CHANGE_PATH)
 		if error == OK:
 			print("CutoutMesh saved to: ", save_path)
 			cutout_mesh_created.emit(cutout_mesh)

@@ -7,64 +7,60 @@ extends RefCounted
 # Triangulate polygon with multiple fallback methods for robustness
 static func triangulate_with_fallbacks(points: PackedVector2Array) -> PackedInt32Array:
 	if points.size() < 3:
-		print("[CutoutGeometryUtils] Triangulation skipped: polygon has less than 3 points")
+		
 		return PackedInt32Array()
 
 	# Initial state logging
 	var area := compute_polygon_area(points)
 	var is_clockwise := area < 0
-	print("[CutoutGeometryUtils] Starting triangulation for polygon with ", points.size(), " points")
-	print("[CutoutGeometryUtils] Area: ", area, ", Winding: ", "CW" if is_clockwise else "CCW")
 
 	# Method 1: Godot's triangulate_polygon expects CCW winding
 	# Incoming points are already CCW after Y-flip in CutoutMesh, so use them directly
-	print("[CutoutGeometryUtils] Method 1: Attempting Godot triangulator (trusting incoming winding)")
 
 	var triangles := Geometry2D.triangulate_polygon(points)
 	if not triangles.is_empty():
-		print("[CutoutGeometryUtils] Method 1: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+		
 		return triangles
-	print("[CutoutGeometryUtils] Method 1: FAILED - returned empty")
 
 	# Method 2: Try the opposite winding if first attempt failed
-	print("[CutoutGeometryUtils] Method 2: Attempting opposite winding")
+	
 	var opposite_points := PackedVector2Array()
 	for i in range(points.size() - 1, -1, -1):
 		opposite_points.append(points[i])
 	triangles = Geometry2D.triangulate_polygon(opposite_points)
 	if not triangles.is_empty():
-		print("[CutoutGeometryUtils] Method 2: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+		
 		return triangles
-	print("[CutoutGeometryUtils] Method 2: FAILED - returned empty")
+	
 
 	# Method 3: Try removing duplicate/degenerate vertices
-	print("[CutoutGeometryUtils] Method 3: Cleaning degenerate vertices")
+	
 	var cleaned := clean_polygon(points)
 	var removed_count := points.size() - cleaned.size()
-	print("[CutoutGeometryUtils] Method 3: Removed ", removed_count, " vertices (", cleaned.size(), " remaining)")
+	
 	if cleaned.size() >= 3:
 		triangles = Geometry2D.triangulate_polygon(cleaned)
 		if not triangles.is_empty():
-			print("[CutoutGeometryUtils] Method 3: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+			
 			return triangles
-	print("[CutoutGeometryUtils] Method 3: FAILED - returned empty")
+	
 
 	# Method 4: Fallback to ear clipping algorithm
-	print("[CutoutGeometryUtils] Method 4: Attempting custom ear clipping")
+	
 	triangles = ear_clipping_triangulation(points)
 	if not triangles.is_empty():
-		print("[CutoutGeometryUtils] Method 4: SUCCESS - Generated ", triangles.size() / 3, " triangles")
+		
 		return triangles
-	print("[CutoutGeometryUtils] Method 4: FAILED - ear clipping failed")
+	
 
 	# Method 5: Last resort - use convex hull
 	push_warning("[CutoutGeometryUtils] ⚠️ WARNING: Method 5 - Using CONVEX HULL fallback")
 	push_warning("[CutoutGeometryUtils] ⚠️ This will create triangles OUTSIDE the polygon boundary!")
-	print("[CutoutGeometryUtils] Method 5: Generating convex hull")
+	
 	var hull := Geometry2D.convex_hull(points)
-	print("[CutoutGeometryUtils] Method 5: Hull has ", hull.size(), " points (original had ", points.size(), " points)")
+	
 	triangles = Geometry2D.triangulate_polygon(hull)
-	print("[CutoutGeometryUtils] Method 5: Generated ", triangles.size() / 3, " triangles from convex hull")
+	
 	return triangles
 
 # Test if polygon has self-intersecting edges
@@ -89,7 +85,7 @@ static func has_self_intersections(polygon: PackedVector2Array) -> bool:
 			var p4 = polygon[(j + 1) % n]
 
 			if _segments_intersect(p1, p2, p3, p4):
-				print("[CutoutGeometryUtils] Self-intersection detected between edges ", i, " and ", j)
+				
 				return true
 
 	return false
