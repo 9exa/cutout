@@ -30,6 +30,13 @@ enum SeedPattern {
 		notify_property_list_changed()
 		emit_changed()
 
+## Target number of fragments to generate.
+## The actual number may vary depending on the polygon shape and pattern.
+@export_range(2, 100, 1) var fragment_count: int = 10:
+	set(value):
+		fragment_count = value
+		emit_changed()
+
 ## Minimum distance between Voronoi seed points as a fraction of polygon bounds.
 ## Prevents cells from becoming too small. Higher values = larger minimum cell size.
 @export_range(0.01, 0.5, 0.01) var min_cell_distance: float = 0.1:
@@ -48,7 +55,7 @@ enum SeedPattern {
 var _grid_rows: int = 3
 var _grid_cols: int = 3
 var _grid_jitter: float = 0.3
-var _impact_point: Vector2 = Vector2.ZERO
+var _origin: Vector2 = Vector2.ZERO
 var _ring_count: int = 3
 var _ring_size: float = 50.0  # Distance in pixels between rings
 var _points_per_ring: int = 8
@@ -69,21 +76,21 @@ func _get_property_list() -> Array[Dictionary]:
 	match pattern:
 		SeedPattern.GRID:
 			properties.append({
-				"name": "_grid_rows",
+				"name": "grid_rows",
 				"type": TYPE_INT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "1,20,1",
 				"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE
 			})
 			properties.append({
-				"name": "_grid_cols",
+				"name": "grid_cols",
 				"type": TYPE_INT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "1,20,1",
 				"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE
 			})
 			properties.append({
-				"name": "_grid_jitter",
+				"name": "grid_jitter",
 				"type": TYPE_FLOAT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "0.0,1.0,0.01",
@@ -92,33 +99,33 @@ func _get_property_list() -> Array[Dictionary]:
 
 		SeedPattern.RADIAL, SeedPattern.SPIDERWEB:
 			properties.append({
-				"name": "_impact_point",
+				"name": "origin",
 				"type": TYPE_VECTOR2,
 				"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE
 			})
 			properties.append({
-				"name": "_ring_count",
+				"name": "ring_count",
 				"type": TYPE_INT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "1,10,1",
 				"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE
 			})
 			properties.append({
-				"name": "_ring_size",
+				"name": "ring_size",
 				"type": TYPE_FLOAT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "10.0,200.0,5.0",
 				"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE
 			})
 			properties.append({
-				"name": "_points_per_ring",
+				"name": "points_per_ring",
 				"type": TYPE_INT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "3,24,1",
 				"usage": PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE
 			})
 			properties.append({
-				"name": "_radial_variation",
+				"name": "radial_variation",
 				"type": TYPE_FLOAT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "0.0,1.0,0.01",
@@ -127,7 +134,7 @@ func _get_property_list() -> Array[Dictionary]:
 
 		SeedPattern.POISSON_DISK:
 			properties.append({
-				"name": "_poisson_attempts",
+				"name": "poisson_attempts",
 				"type": TYPE_INT,
 				"hint": PROPERTY_HINT_RANGE,
 				"hint_string": "10,100,1",
@@ -140,54 +147,54 @@ func _get_property_list() -> Array[Dictionary]:
 ## Get property values for pattern-specific parameters.
 func _get(property: StringName):
 	match property:
-		"_grid_rows": return _grid_rows
-		"_grid_cols": return _grid_cols
-		"_grid_jitter": return _grid_jitter
-		"_impact_point": return _impact_point
-		"_ring_count": return _ring_count
-		"_ring_size": return _ring_size
-		"_points_per_ring": return _points_per_ring
-		"_radial_variation": return _radial_variation
-		"_poisson_attempts": return _poisson_attempts
+		"grid_rows": return _grid_rows
+		"grid_cols": return _grid_cols
+		"grid_jitter": return _grid_jitter
+		"origin": return _origin
+		"ring_count": return _ring_count
+		"ring_size": return _ring_size
+		"points_per_ring": return _points_per_ring
+		"radial_variation": return _radial_variation
+		"poisson_attempts": return _poisson_attempts
 	return null
 
 
 ## Set property values for pattern-specific parameters.
 func _set(property: StringName, value) -> bool:
 	match property:
-		"_grid_rows":
+		"grid_rows":
 			_grid_rows = value
 			emit_changed()
 			return true
-		"_grid_cols":
+		"grid_cols":
 			_grid_cols = value
 			emit_changed()
 			return true
-		"_grid_jitter":
+		"grid_jitter":
 			_grid_jitter = value
 			emit_changed()
 			return true
-		"_impact_point":
-			_impact_point = value
+		"origin":
+			_origin = value
 			emit_changed()
 			return true
-		"_ring_count":
+		"ring_count":
 			_ring_count = value
 			emit_changed()
 			return true
-		"_ring_size":
+		"ring_size":
 			_ring_size = value
 			emit_changed()
 			return true
-		"_points_per_ring":
+		"points_per_ring":
 			_points_per_ring = value
 			emit_changed()
 			return true
-		"_radial_variation":
+		"radial_variation":
 			_radial_variation = value
 			emit_changed()
 			return true
-		"_poisson_attempts":
+		"poisson_attempts":
 			_poisson_attempts = value
 			emit_changed()
 			return true
@@ -232,6 +239,11 @@ func _fracture(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]
 	# Use Geometry2D.clip_polygons which properly handles holes via Clipper library
 	var fragments: Array[PackedVector2Array] = []
 
+	# Spatial culling optimization: Precompute hole bounding boxes once
+	var hole_bounds: Array[Rect2] = []
+	for hole_idx in range(1, polygons.size()):
+		hole_bounds.append(_calculate_bounds(polygons[hole_idx]))
+
 	for cell in voronoi_cells:
 		# Clip cell against outer polygon first
 		var clipped_outer := Geometry2D.intersect_polygons(cell, outer_polygon)
@@ -240,8 +252,15 @@ func _fracture(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]
 		for fragment in clipped_outer:
 			var remaining := [fragment]
 
-			# Subtract each hole
+			# Calculate fragment bounds once for spatial culling
+			var fragment_bounds := _calculate_bounds(fragment)
+
+			# Subtract each hole (with spatial culling)
 			for hole_idx in range(1, polygons.size()):
+				# Spatial culling: Skip holes that don't overlap fragment bounds
+				if not fragment_bounds.intersects(hole_bounds[hole_idx - 1]):
+					continue
+
 				var hole := polygons[hole_idx]
 				var next_remaining: Array[PackedVector2Array] = []
 
@@ -567,7 +586,7 @@ func _generate_grid_seeds(polygon: PackedVector2Array, bounds: Rect2, rng: Rando
 ## Generates radial seed points in concentric rings.
 func _generate_radial_seeds(polygon: PackedVector2Array, bounds: Rect2, rng: RandomNumberGenerator) -> PackedVector2Array:
 	var points := PackedVector2Array()
-	var center: Vector2 = _impact_point if _impact_point != Vector2.ZERO else bounds.get_center()
+	var center: Vector2 = _origin if _origin != Vector2.ZERO else bounds.get_center()
 	var min_dist: float = min(bounds.size.x, bounds.size.y) * min_cell_distance
 
 	# Calculate maximum radius (distance to furthest corner)
@@ -618,7 +637,7 @@ func _generate_radial_seeds(polygon: PackedVector2Array, bounds: Rect2, rng: Ran
 ## Generates spiderweb seed points (radial rays + concentric rings).
 func _generate_spiderweb_seeds(polygon: PackedVector2Array, bounds: Rect2, rng: RandomNumberGenerator) -> PackedVector2Array:
 	var points := PackedVector2Array()
-	var center: Vector2 = _impact_point if _impact_point != Vector2.ZERO else bounds.get_center()
+	var center: Vector2 = _origin if _origin != Vector2.ZERO else bounds.get_center()
 	var min_dist: float = min(bounds.size.x, bounds.size.y) * min_cell_distance
 
 	# Add center point

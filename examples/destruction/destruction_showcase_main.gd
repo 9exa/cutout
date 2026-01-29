@@ -7,6 +7,11 @@ extends Node3D
 const PlayerController = preload("res://examples/destruction/player_controller.gd")
 const InteractionSystem = preload("res://examples/destruction/interaction_system.gd")
 const DestructibleCutout = preload("res://examples/destruction/destructible_cutout.gd")
+const CutoutDestructionVoronoi = preload("res://addons/cutout/resources/destruction/cutout_destruction_voronoi.gd")
+const CutoutDestructionSlice = preload("res://addons/cutout/resources/destruction/cutout_destruction_slice.gd")
+const CutoutDestructionSlices = preload("res://addons/cutout/resources/destruction/cutout_destruction_slices.gd")
+const CutoutMesh = preload("res://addons/cutout/resources/cutout_mesh.gd")
+const CutoutMeshInstance3D = preload("res://addons/cutout/nodes/cutout_mesh_instance_3d.gd")
 
 # Scene references
 @export_group("Scene References")
@@ -30,11 +35,16 @@ const DestructibleCutout = preload("res://examples/destruction/destructible_cuto
 @export var show_controls_on_start: bool = true
 @export var auto_respawn_delay: float = -1.0  # -1 to disable
 
+# Destruction settings
+@export_group("Destruction Algorithms")
+@export var destruction_algorithms: Array[CutoutDestructionAlgorithm] = []
+
 # Runtime references
 var current_destructible: Node3D
 var player_controller: Node
 var interaction_system: Node
 var fragments_cleared: bool = false
+var current_algorithm_index: int = 0
 
 # Statistics
 var destruction_count: int = 0
@@ -265,6 +275,10 @@ func spawn_destructible() -> void:
 	current_destructible.position = destructible_spawn_position
 	add_child(current_destructible)
 
+	# Set initial algorithm if available
+	if not destruction_algorithms.is_empty() and current_destructible.has_method("set_destruction_algorithm"):
+		current_destructible.set_destruction_algorithm(destruction_algorithms[current_algorithm_index])
+
 	# Connect to destruction signal if available
 	if current_destructible.has_signal("destroyed"):
 		current_destructible.destroyed.connect(_on_destructible_destroyed.bind(current_destructible))
@@ -353,7 +367,7 @@ func update_debug_info() -> void:
 		return
 
 	var fps: int = Engine.get_frames_per_second() if show_fps else 0
-	var pattern_name: String = current_destructible.get_pattern_name() if current_destructible and current_destructible.has_method("get_pattern_name") else "Unknown"
+	var pattern_name: String = get_current_algorithm_name()
 
 	var text := ""
 	if show_fps:
@@ -378,53 +392,73 @@ func reset_scene() -> void:
 		spawn_destructible()
 
 	# Update UI
-	if pattern_label and current_destructible and current_destructible.has_method("get_pattern_name"):
-		pattern_label.text = "Pattern: " + current_destructible.get_pattern_name()
+	if pattern_label:
+		pattern_label.text = "Pattern: " + get_current_algorithm_name()
+
+
+func get_current_algorithm_name() -> String:
+	if destruction_algorithms.is_empty():
+		return "None"
+
+	if current_algorithm_index >= destruction_algorithms.size():
+		return "Invalid Index"
+
+	return get_algorithm_name(destruction_algorithms[current_algorithm_index])
+
+
+func get_algorithm_name(algorithm: CutoutDestructionAlgorithm) -> String:
+	if algorithm == null:
+		return "None"
+
+	# Check algorithm type
+	if algorithm is CutoutDestructionVoronoi:
+		var voronoi := algorithm as CutoutDestructionVoronoi
+		match voronoi.pattern:
+			CutoutDestructionVoronoi.SeedPattern.RANDOM:
+				return "Voronoi: Random"
+			CutoutDestructionVoronoi.SeedPattern.GRID:
+				return "Voronoi: Grid"
+			CutoutDestructionVoronoi.SeedPattern.RADIAL:
+				return "Voronoi: Radial"
+			CutoutDestructionVoronoi.SeedPattern.SPIDERWEB:
+				return "Voronoi: Spiderweb"
+			CutoutDestructionVoronoi.SeedPattern.POISSON_DISK:
+				return "Voronoi: Poisson Disk"
+			_:
+				return "Voronoi: Unknown"
+	elif algorithm is CutoutDestructionSlice:
+		return "Slice"
+	elif algorithm is CutoutDestructionSlices:
+		var slices := algorithm as CutoutDestructionSlices
+		match slices.pattern:
+			CutoutDestructionSlices.Pattern.PARALLEL:
+				return "Slices: Parallel"
+			CutoutDestructionSlices.Pattern.RADIAL:
+				return "Slices: Radial"
+			CutoutDestructionSlices.Pattern.GRID:
+				return "Slices: Grid"
+			_:
+				return "Slices: Unknown"
+	else:
+		# Generic fallback - use the class name
+		return algorithm.get_class().replace("CutoutDestruction", "")
 
 
 func cycle_destruction_pattern() -> void:
-	if not current_destructible or not current_destructible.has_method("cycle_pattern"):
+	if not current_destructible or destruction_algorithms.is_empty():
 		return
 
-	current_destructible.cycle_pattern()
+	# Cycle to next algorithm in the array
+	current_algorithm_index = (current_algorithm_index + 1) % destruction_algorithms.size()
+	var algorithm := destruction_algorithms[current_algorithm_index]
 
-	# Update UI
-	if pattern_label:
-		pattern_label.text = "Pattern: " + current_destructible.get_pattern_name()
-
-
-func create_destruction_algorithm(pattern: CutoutDestructionVoronoi.SeedPattern) -> CutoutDestructionVoronoi:
-	var algorithm := CutoutDestructionVoronoi.new()
-	algorithm.pattern = pattern
-	algorithm.fragment_count = 15
-
-	# Set pattern-specific defaults
-	match pattern:
-		CutoutDestructionVoronoi.SeedPattern.GRID:
-			algorithm.grid_rows = 4
-			algorithm.grid_cols = 4
-			algorithm.grid_jitter = 0.2
-
-		CutoutDestructionVoronoi.SeedPattern.RADIAL, CutoutDestructionVoronoi.SeedPattern.SPIDERWEB:
-			algorithm.impact_point = Vector2(0.5, 0.5)
-			algorithm.ring_count = 3
-			algorithm.points_per_ring = 8
-
-	return algorithm
-
-
-func set_destruction_pattern(pattern: CutoutDestructionVoronoi.SeedPattern) -> void:
-	if not current_destructible:
-		return
-
-	var algorithm := create_destruction_algorithm(pattern)
-
+	# Set the algorithm on the destructible
 	if current_destructible.has_method("set_destruction_algorithm"):
 		current_destructible.set_destruction_algorithm(algorithm)
 
 	# Update UI
 	if pattern_label:
-		pattern_label.text = "Pattern: " + current_destructible.get_pattern_name()
+		pattern_label.text = "Pattern: " + get_algorithm_name(algorithm)
 
 
 func clear_all_fragments() -> void:

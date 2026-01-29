@@ -109,8 +109,12 @@ func create_collision_shape(offset: Vector3) -> void:
 	add_child(collision_shape)
 
 
-func apply_explosion_force(direction: Vector3, force: float, torque: float) -> void:
-	# Apply central impulse
+func apply_explosion_force(direction: Vector3, force: float, torque: float, initial_impulse: Vector3 = Vector3.ZERO) -> void:
+	# Apply initial impulse first (if provided)
+	if not initial_impulse.is_zero_approx():
+		apply_central_impulse(initial_impulse)
+
+	# Apply directional explosion force
 	apply_central_impulse(direction * force)
 
 	# Apply random torque for rotation

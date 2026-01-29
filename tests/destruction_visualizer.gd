@@ -340,15 +340,25 @@ func _draw() -> void:
 
 	# Draw fragments
 	if show_fragments and not _fragments.is_empty():
+		# Get background color from project settings
+		var bg_color: Color = ProjectSettings.get_setting("rendering/environment/defaults/default_clear_color", Color(0.3, 0.3, 0.3))
+
 		for i in range(_fragments.size()):
 			var fragment := _fragments[i]
 
 			if fragment.size() < 3:
 				continue
 
+			# Check if this is a hole (CCW winding = negative area)
+			var area := _calculate_polygon_area(fragment)
+			var is_hole := area < 0.0
+
 			# Generate color for this fragment
 			var color: Color
-			if colorize_fragments:
+			if is_hole:
+				# Holes are filled with background color to appear as actual holes
+				color = bg_color
+			elif colorize_fragments:
 				var hue: float = float(i) / max(_fragments.size(), 1)
 				color = Color.from_hsv(hue, 0.7, 0.9, fragment_alpha)
 			else:
@@ -357,12 +367,13 @@ func _draw() -> void:
 			# Draw filled fragment
 			draw_colored_polygon(fragment, color)
 
-			# Draw outline
+			# Draw outline (different color for holes)
 			if fragment_outline_width > 0 and fragment_outline_color.a > 0:
+				var outline_color := hole_outline_color if is_hole else fragment_outline_color
 				for j in range(fragment.size()):
 					var p1 := fragment[j]
 					var p2 := fragment[(j + 1) % fragment.size()]
-					draw_line(p1, p2, fragment_outline_color, fragment_outline_width)
+					draw_line(p1, p2, outline_color, fragment_outline_width)
 
 	# Draw seed points (should be centered in fragments)
 	if show_seed_points and destruction_algorithm:
@@ -399,3 +410,17 @@ func _draw() -> void:
 				if show_voronoi_vertices:
 					var vertex_text := "Voronoi Vertices: %d" % voronoi_algo._debug_voronoi_vertices.size()
 					draw_string(ThemeDB.fallback_font, Vector2(10, 105), vertex_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color.WHITE)
+
+
+## Calculate the signed area of a polygon using the shoelace formula.
+## Positive area indicates CCW winding, negative indicates CW winding.
+func _calculate_polygon_area(polygon: PackedVector2Array) -> float:
+	var area := 0.0
+	var n := polygon.size()
+
+	for i in range(n):
+		var j := (i + 1) % n
+		area += polygon[i].x * polygon[j].y
+		area -= polygon[j].x * polygon[i].y
+
+	return area * 0.5

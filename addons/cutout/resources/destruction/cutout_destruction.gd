@@ -24,13 +24,6 @@ extends Resource
 		seed = value
 		emit_changed()
 
-## Target number of fragments to generate.
-## The actual number may vary depending on the algorithm and polygon shape.
-@export_range(2, 100, 1) var fragment_count: int = 10:
-	set(value):
-		fragment_count = value
-		emit_changed()
-
 
 ## Fractures a polygon (with optional holes) into multiple smaller fragments.
 ##

@@ -108,7 +108,7 @@ func destruct() -> void:
 
     # Create destruction algorithm
     var destruction = CutoutDestructionVoronoi.new()
-    destruction.fragment_count = fragment_count
+    destruction.fragment_count = 15  # Voronoi-specific property
     destruction.pattern = destruction_pattern
     destruction.seed = randi()
 

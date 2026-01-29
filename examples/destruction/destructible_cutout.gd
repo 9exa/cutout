@@ -12,7 +12,7 @@ signal destroyed()
 
 # Destruction settings
 @export_group("Destruction")
-@export var destruction_algorithm: CutoutDestructionVoronoi
+@export var destruction_algorithm: CutoutDestructionAlgorithm
 @export var min_fragment_size: float = 0.01  # Minimum fragment area to spawn
 
 # Physics settings
@@ -76,7 +76,7 @@ func _ready() -> void:
 	if auto_destruct_delay > 0:
 		await get_tree().create_timer(auto_destruct_delay).timeout
 		if not is_destroyed:
-			destruct()
+			destruct(Vector3.ZERO)
 
 	# Create fragments container
 	fragments_container = Node3D.new()
@@ -94,11 +94,13 @@ func get_interaction_prompt() -> String:
 
 
 func interact() -> void:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	var force = explosion_force * (global_position - camera.global_position).normalized()
 	if can_interact():
-		destruct()
+		destruct(force)
 
 # Main destruction method
-func destruct(custom_impact_point: Vector2 = Vector2(-1, -1)) -> void:
+func destruct(force: Vector3, custom_impact_point: Vector2 = Vector2(-1, -1)) -> void:
 	print("[destructible_cutout] Destruction initiated.")
 	if is_destroyed or not mesh_instance or not mesh_instance.cutout_mesh:
 		return
@@ -122,7 +124,7 @@ func destruct(custom_impact_point: Vector2 = Vector2(-1, -1)) -> void:
 	var fragment_index := 0
 	for fragment_polygon in fragments:
 		if is_fragment_valid(fragment_polygon):
-			spawn_fragment(fragment_polygon, cutout_mesh, fragment_index)
+			spawn_fragment(fragment_polygon, cutout_mesh, fragment_index, force)
 			fragment_index += 1
 
 	# Play explosion sound
@@ -144,11 +146,10 @@ func destruct(custom_impact_point: Vector2 = Vector2(-1, -1)) -> void:
 	destroyed.emit()
 
 
-func create_destruction_algorithm() -> CutoutDestructionVoronoi:
+func create_destruction_algorithm() -> CutoutDestructionAlgorithm:
 	# Use existing algorithm if available, otherwise create a default one
 	if not destruction_algorithm:
 		destruction_algorithm = CutoutDestructionVoronoi.new()
-		destruction_algorithm.fragment_count = 15
 		destruction_algorithm.pattern = CutoutDestructionVoronoi.SeedPattern.RANDOM
 
 	# Always randomize the seed on each destruction
@@ -157,12 +158,13 @@ func create_destruction_algorithm() -> CutoutDestructionVoronoi:
 	return destruction_algorithm
 
 
-func spawn_fragment(polygon: PackedVector2Array, original_mesh: CutoutMesh, index: int) -> void:
+func spawn_fragment(polygon: PackedVector2Array, original_mesh: CutoutMesh, index: int, initial_force: Vector3 = Vector3.ZERO) -> void:
 	# Create fragment CutoutMesh
-	var fragment_mesh := CutoutMesh.new()
-	fragment_mesh.texture = original_mesh.texture
-	fragment_mesh.mask = [polygon]
-	fragment_mesh.depth = original_mesh.depth
+	# var fragment_mesh := CutoutMesh.new()
+	# fragment_mesh.texture = original_mesh.texture
+	# fragment_mesh.depth = original_mesh.depth
+	var fragment_mesh := original_mesh.duplicate(true)
+	fragment_mesh.mask.assign([polygon])
 	fragment_mesh.mesh_size = original_mesh.mesh_size
 	fragment_mesh.extrusion_texture_scale = original_mesh.extrusion_texture_scale
 
@@ -208,7 +210,7 @@ func spawn_fragment(polygon: PackedVector2Array, original_mesh: CutoutMesh, inde
 	fragment_direction = fragment_direction.normalized()
 
 	# Delay physics activation slightly to ensure proper setup
-	fragment.call_deferred("apply_explosion_force", fragment_direction, explosion_force, rotation_force)
+	fragment.call_deferred("apply_explosion_force", fragment_direction, explosion_force, rotation_force, initial_force)
 
 	
 
@@ -277,46 +279,8 @@ func _on_fragment_freed(fragment: Node3D) -> void:
 
 
 # Utility methods for external control
-func set_destruction_algorithm(algorithm: CutoutDestructionVoronoi) -> void:
+func set_destruction_algorithm(algorithm: CutoutDestructionAlgorithm) -> void:
 	destruction_algorithm = algorithm
-
-
-func set_destruction_pattern(pattern: CutoutDestructionVoronoi.SeedPattern) -> void:
-	# Ensure we have an algorithm
-	if not destruction_algorithm:
-		destruction_algorithm = CutoutDestructionVoronoi.new()
-
-	destruction_algorithm.pattern = pattern
-
-
-func cycle_pattern() -> void:
-	# Ensure we have an algorithm
-	if not destruction_algorithm:
-		destruction_algorithm = CutoutDestructionVoronoi.new()
-
-	var patterns := CutoutDestructionVoronoi.SeedPattern.values()
-	var current_index := patterns.find(destruction_algorithm.pattern)
-	var next_index := (current_index + 1) % patterns.size()
-	destruction_algorithm.pattern = patterns[next_index]
-
-
-func get_pattern_name() -> String:
-	if not destruction_algorithm:
-		return "None"
-
-	match destruction_algorithm.pattern:
-		CutoutDestructionVoronoi.SeedPattern.RANDOM:
-			return "Random"
-		CutoutDestructionVoronoi.SeedPattern.GRID:
-			return "Grid"
-		CutoutDestructionVoronoi.SeedPattern.RADIAL:
-			return "Radial"
-		CutoutDestructionVoronoi.SeedPattern.SPIDERWEB:
-			return "Spiderweb"
-		CutoutDestructionVoronoi.SeedPattern.POISSON_DISK:
-			return "Poisson Disk"
-		_:
-			return "Unknown"
 
 
 func get_fragment_count() -> int:
