@@ -66,6 +66,7 @@ static func _marching_squares_optimized(bitmap: BitMap) -> Array[PackedVector2Ar
 		return contours
 
 	# Create visited bitmap to track processed cells
+	# Note: This persists across all contours to prevent re-processing shared edges
 	var visited := {}  # Use dictionary with integer keys for speed
 
 	# Single pass: Find all starting points at once
@@ -84,25 +85,25 @@ static func _marching_squares_optimized(bitmap: BitMap) -> Array[PackedVector2Ar
 		if size.x > 1 and bitmap.get_bit(size.x - 1, y):
 			edge_points.append(Vector2i(size.x - 1, y))
 
-	# Then scan interior more efficiently (skip rows/columns that are fully inside)
-	var scan_step := 2  # Can increase for very large images
-	for y in range(scan_step, size.y - scan_step, scan_step):
-		var found_edge_in_row := false
-		for x in range(scan_step, size.x - scan_step, scan_step):
+	# Then scan interior with adaptive step size to catch thin features
+	for y in range(1, size.y - 1):
+		# Use adaptive scanning: step=2 normally, but step=1 near detected edges
+		var x := 1
+		while x < size.x - 1:
 			if bitmap.get_bit(x, y) and _is_edge_pixel_fast(bitmap, x, y, size):
 				edge_points.append(Vector2i(x, y))
-				found_edge_in_row = true
-				# Once we find an edge, check nearby pixels more carefully
-				for dy in range(-1, 2):
-					for dx in range(-1, 2):
-						var nx = x + dx
-						var ny = y + dy
-						if nx > 0 and nx < size.x - 1 and ny > 0 and ny < size.y - 1:
-							if bitmap.get_bit(nx, ny) and _is_edge_pixel_fast(bitmap, nx, ny, size):
-								edge_points.append(Vector2i(nx, ny))
+				# Switch to step=1 for next few pixels to catch thin features
+				x += 1
+			else:
+				# No edge here, can skip ahead
+				x += 2
 
 	# Process each edge point
 	for point in edge_points:
+		# Bounds check: Can't create cell from pixels at position 0
+		if point.x == 0 or point.y == 0:
+			continue
+
 		var cell_x: int = point.x - 1
 		var cell_y: int = point.y - 1
 
@@ -113,10 +114,31 @@ static func _marching_squares_optimized(bitmap: BitMap) -> Array[PackedVector2Ar
 
 		# Trace the contour from this cell
 		var contour := _trace_contour_optimized(bitmap, cell_x, cell_y, size, visited)
-		if contour.size() > 3:  # Only add valid contours (minimum triangle)
+		if contour.size() >= 3:  # Minimum valid closed contour (triangle)
+			# Ensure clockwise winding order (CW = solid, CCW = hole)
+			_normalize_winding_order(contour)
 			contours.append(contour)
 
 	return contours
+
+
+## Normalize contour to clockwise winding order using shoelace formula
+static func _normalize_winding_order(contour: PackedVector2Array) -> void:
+	if contour.size() < 3:
+		return
+
+	# Calculate signed area using shoelace formula
+	# Positive area = counter-clockwise, Negative = clockwise
+	var signed_area := 0.0
+	var n := contour.size()
+	for i in range(n):
+		var j := (i + 1) % n
+		signed_area += contour[i].x * contour[j].y
+		signed_area -= contour[j].x * contour[i].y
+
+	# If counter-clockwise (positive area), reverse to make clockwise
+	if signed_area > 0:
+		contour.reverse()
 
 
 ## Fast edge pixel check (inline for performance)

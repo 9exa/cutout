@@ -16,6 +16,8 @@ signal cutout_mesh_created(mesh: CutoutMesh)
 @export var contour_algorithm_option: OptionButton
 @export var alpha_threshold_slider: HSlider
 @export var alpha_threshold_value: Label
+@export var max_resolution_slider: HSlider
+@export var max_resolution_value: Label
 
 ## Pre-Simplification Controls
 @export_group("Pre-Simplification")
@@ -43,10 +45,15 @@ signal cutout_mesh_created(mesh: CutoutMesh)
 
 ## Preview Controls
 @export_group("Preview")
-@export var preview_viewport: SubViewport
-@export var preview_camera: Camera2D
-# Polygon preview instance
+@export var preview_tab_container: TabContainer
+@export var preview_container_2d: SubViewportContainer
+@export var preview_viewport_2d: SubViewport
+@export var preview_camera_2d: PanZoomCamera2D
 @export var polygon_preview: Node2D
+@export var preview_container_3d: SubViewportContainer
+@export var preview_viewport_3d: SubViewport
+@export var mesh_preview_3d: MeshPreview3D
+@export var orbit_camera_3d: OrbitCamera3D
 
 ## Mesh Settings Controls
 @export_group("Mesh Settings")
@@ -66,6 +73,9 @@ signal cutout_mesh_created(mesh: CutoutMesh)
 # Algorithm instances
 var current_texture: Texture2D
 var current_image: Image
+
+# Live 3D preview mesh
+var _preview_cutout_mesh: CutoutMesh
 
 var contour_algorithm: CutoutContourAlgorithm
 var pre_simp_algorithm: CutoutPolysimpAlgorithm
@@ -138,6 +148,12 @@ func _validate_ui_references() -> bool:
 	if not alpha_threshold_value:
 		push_warning("CutoutDock: alpha_threshold_value not assigned")
 		all_valid = false
+	if not max_resolution_slider:
+		push_warning("CutoutDock: max_resolution_slider not assigned")
+		all_valid = false
+	if not max_resolution_value:
+		push_warning("CutoutDock: max_resolution_value not assigned")
+		all_valid = false
 
 	# Algorithm sections
 	if not pre_simp_algorithm_option:
@@ -162,11 +178,29 @@ func _validate_ui_references() -> bool:
 		all_valid = false
 
 	# Preview section
-	if not preview_viewport:
-		push_warning("CutoutDock: preview_viewport not assigned")
+	if not preview_tab_container:
+		push_warning("CutoutDock: preview_tab_container not assigned")
 		all_valid = false
-	if not preview_camera:
-		push_warning("CutoutDock: preview_camera not assigned")
+	if not preview_container_2d:
+		push_warning("CutoutDock: preview_container_2d not assigned")
+		all_valid = false
+	if not preview_viewport_2d:
+		push_warning("CutoutDock: preview_viewport_2d not assigned")
+		all_valid = false
+	if not preview_camera_2d:
+		push_warning("CutoutDock: preview_camera_2d not assigned")
+		all_valid = false
+	if not preview_container_3d:
+		push_warning("CutoutDock: preview_container_3d not assigned")
+		all_valid = false
+	if not preview_viewport_3d:
+		push_warning("CutoutDock: preview_viewport_3d not assigned")
+		all_valid = false
+	if not mesh_preview_3d:
+		push_warning("CutoutDock: mesh_preview_3d not assigned")
+		all_valid = false
+	if not orbit_camera_3d:
+		push_warning("CutoutDock: orbit_camera_3d not assigned")
 		all_valid = false
 
 	# Mesh settings
@@ -230,6 +264,12 @@ func _setup_ui():
 		alpha_threshold_slider.value = 0.5
 		alpha_threshold_slider.step = 0.01
 
+	if max_resolution_slider:
+		max_resolution_slider.min_value = 0
+		max_resolution_slider.max_value = 4096
+		max_resolution_slider.value = 0
+		max_resolution_slider.step = 64
+
 	if depth_slider:
 		depth_slider.min_value = 0.01
 		depth_slider.max_value = 1.0
@@ -259,6 +299,11 @@ func _setup_algorithms():
 		contour_algorithm.alpha_threshold = alpha_threshold_slider.value
 	else:
 		contour_algorithm.alpha_threshold = 0.5  # Default value
+
+	if max_resolution_slider:
+		contour_algorithm.max_resolution = int(max_resolution_slider.value)
+	else:
+		contour_algorithm.max_resolution = 0  # Default value (no downscaling)
 
 	pre_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_rdp.gd").new()
 	pre_simp_algorithm.epsilon = 2.0
@@ -396,6 +441,9 @@ func _connect_signals():
 	if alpha_threshold_slider:
 		alpha_threshold_slider.value_changed.connect(_on_alpha_threshold_changed)
 
+	if max_resolution_slider:
+		max_resolution_slider.value_changed.connect(_on_max_resolution_changed)
+
 	if contour_algorithm_option:
 		contour_algorithm_option.item_selected.connect(_on_contour_algorithm_changed)
 
@@ -434,6 +482,12 @@ func _connect_signals():
 		smooth_algorithm.changed.connect(func(): _mark_dirty("smooth"); _run_pipeline())
 	if post_simp_algorithm:
 		post_simp_algorithm.changed.connect(func(): _mark_dirty("post_simp"); _run_pipeline())
+
+	# Connect SubViewportContainer gui_input signals to camera handlers
+	if preview_container_2d and preview_camera_2d:
+		preview_container_2d.gui_input.connect(_on_preview_2d_gui_input)
+	if preview_container_3d and orbit_camera_3d:
+		preview_container_3d.gui_input.connect(_on_preview_3d_gui_input)
 
 func _on_image_selector_pressed():
 	var file_dialog = FileDialog.new()
@@ -484,19 +538,12 @@ func _load_image(path: String):
 		_run_pipeline()
 
 func _fit_camera_to_image():
-	if not current_texture or not preview_camera or not preview_viewport:
+	if not current_texture or not preview_camera_2d:
 		return
 
-	var image_size = current_texture.get_size()
-	var viewport_size = preview_viewport.get_size()
-
-	# Calculate zoom to fit image
-	var scale_x = viewport_size.x / image_size.x
-	var scale_y = viewport_size.y / image_size.y
-	var scale = min(scale_x, scale_y) * 0.9  # 90% to have some margin
-
-	preview_camera.zoom = Vector2(scale, scale)
-	preview_camera.position = image_size / 2.0
+	var image_size := current_texture.get_size()
+	var image_rect := Rect2(Vector2.ZERO, image_size)
+	preview_camera_2d.fit_to_rect(image_rect, 0.9)
 
 func _run_pipeline():
 	if not current_image:
@@ -556,13 +603,57 @@ func _run_pipeline():
 	else:
 		final_polygon = polygon
 
-	# Update preview
+	# Update 2D preview
 	if polygon_preview:
 		polygon_preview.set_polygon(polygon)
+
+	# Update 3D preview
+	_update_3d_preview()
+
+func _update_3d_preview() -> void:
+	if not mesh_preview_3d or not current_texture or final_polygon.is_empty():
+		if mesh_preview_3d:
+			mesh_preview_3d.clear()
+		return
+
+	# Create or update the preview CutoutMesh
+	if not _preview_cutout_mesh:
+		_preview_cutout_mesh = CutoutMesh.new()
+
+	_preview_cutout_mesh.texture = current_texture
+	_preview_cutout_mesh.mask.assign([final_polygon])
+	_preview_cutout_mesh.depth = depth_slider.value if depth_slider else 0.1
+	_preview_cutout_mesh.mesh_size = Vector2(
+		mesh_width_spinbox.value if mesh_width_spinbox else 1.0,
+		mesh_height_spinbox.value if mesh_height_spinbox else 1.0
+	)
+
+	# Assign to the 3D preview
+	mesh_preview_3d.set_cutout_mesh(_preview_cutout_mesh)
+
+	# Fit the orbit camera to the mesh
+	_fit_3d_camera()
+
+
+func _fit_3d_camera() -> void:
+	if not orbit_camera_3d or not mesh_preview_3d or not _preview_cutout_mesh:
+		return
+
+	var bounds := mesh_preview_3d.get_mesh_bounds()
+	var center := mesh_preview_3d.get_mesh_center()
+	orbit_camera_3d.fit_to_bounds(bounds.size, center)
+
 
 func _on_alpha_threshold_changed(value: float):
 	if contour_algorithm:
 		contour_algorithm.alpha_threshold = value
+	_mark_dirty("contour")
+	_run_pipeline()
+	_update_value_labels()
+
+func _on_max_resolution_changed(value: float):
+	if contour_algorithm:
+		contour_algorithm.max_resolution = int(value)
 	_mark_dirty("contour")
 	_run_pipeline()
 	_update_value_labels()
@@ -578,6 +669,12 @@ func _on_contour_algorithm_changed(index: int):
 		contour_algorithm.alpha_threshold = alpha_threshold_slider.value
 	else:
 		contour_algorithm.alpha_threshold = 0.5  # Default value
+
+	if max_resolution_slider:
+		contour_algorithm.max_resolution = int(max_resolution_slider.value)
+	else:
+		contour_algorithm.max_resolution = 0  # Default value
+
 	contour_algorithm.changed.connect(func(): _mark_dirty("contour"); _run_pipeline())
 	_mark_dirty("contour")
 	_run_pipeline()
@@ -758,13 +855,20 @@ func _update_algorithm_params(container: VBoxContainer, algorithm: Resource):
 
 func _on_depth_changed(value: float):
 	_update_value_labels()
+	_update_3d_preview()
 
 func _on_mesh_size_changed(_value: float):
-	pass  # Will be used when creating the mesh
+	_update_3d_preview()
 
 func _update_value_labels():
 	if alpha_threshold_value and alpha_threshold_slider:
 		alpha_threshold_value.text = "%.2f" % alpha_threshold_slider.value
+	if max_resolution_value and max_resolution_slider:
+		var val = int(max_resolution_slider.value)
+		if val == 0:
+			max_resolution_value.text = "Off"
+		else:
+			max_resolution_value.text = "%d" % val
 	if depth_value and depth_slider:
 		depth_value.text = "%.2f" % depth_slider.value
 
@@ -857,3 +961,15 @@ func _resolve_self_intersections(polygon: PackedVector2Array) -> PackedVector2Ar
 	if merged_polygons.size() > 0:
 		return merged_polygons[0]
 	return polygon
+
+
+## Forward 2D preview input to the pan/zoom camera
+func _on_preview_2d_gui_input(event: InputEvent) -> void:
+	if preview_camera_2d:
+		preview_camera_2d.handle_input(event)
+
+
+## Forward 3D preview input to the orbit camera
+func _on_preview_3d_gui_input(event: InputEvent) -> void:
+	if orbit_camera_3d:
+		orbit_camera_3d.handle_input(event)
