@@ -14,10 +14,7 @@ signal cutout_mesh_created(mesh: CutoutMesh)
 @export var contour_section_button: Button  # Collapse/expand button
 @export var contour_section_content: VBoxContainer  # Content container
 @export var contour_algorithm_option: OptionButton
-@export var alpha_threshold_slider: HSlider
-@export var alpha_threshold_value: Label
-@export var max_resolution_slider: HSlider
-@export var max_resolution_value: Label
+@export var contour_params: VBoxContainer
 
 ## Pre-Simplification Controls
 @export_group("Pre-Simplification")
@@ -82,6 +79,11 @@ var pre_simp_algorithm: CutoutPolysimpAlgorithm
 var smooth_algorithm: CutoutSmoothAlgorithm
 var post_simp_algorithm: CutoutPolysimpAlgorithm
 
+# Cached algorithm lists from registry (for dropdown index mapping)
+var _contour_algorithms: Array = []
+var _polysimp_algorithms: Array = []
+var _smooth_algorithms: Array = []
+
 # Pipeline results - intermediate polygons for incremental computation
 var contour_polygon: PackedVector2Array = PackedVector2Array()
 var pre_simp_polygon: PackedVector2Array = PackedVector2Array()
@@ -142,17 +144,8 @@ func _validate_ui_references() -> bool:
 	if not contour_algorithm_option:
 		push_warning("CutoutDock: contour_algorithm_option not assigned")
 		all_valid = false
-	if not alpha_threshold_slider:
-		push_warning("CutoutDock: alpha_threshold_slider not assigned")
-		all_valid = false
-	if not alpha_threshold_value:
-		push_warning("CutoutDock: alpha_threshold_value not assigned")
-		all_valid = false
-	if not max_resolution_slider:
-		push_warning("CutoutDock: max_resolution_slider not assigned")
-		all_valid = false
-	if not max_resolution_value:
-		push_warning("CutoutDock: max_resolution_value not assigned")
+	if not contour_params:
+		push_warning("CutoutDock: contour_params not assigned")
 		all_valid = false
 
 	# Algorithm sections
@@ -231,45 +224,41 @@ func _validate_ui_references() -> bool:
 	return all_valid
 
 func _setup_ui():
-	# Setup algorithm dropdowns
+	# Discover algorithms from registry
+	_contour_algorithms = CutoutAlgorithmRegistry.get_contour_algorithms()
+	_polysimp_algorithms = CutoutAlgorithmRegistry.get_polysimp_algorithms()
+	_smooth_algorithms = CutoutAlgorithmRegistry.get_smooth_algorithms()
+
+	# Setup algorithm dropdowns dynamically
 	if contour_algorithm_option:
 		contour_algorithm_option.clear()
-		contour_algorithm_option.add_item("Moore Neighbour")
-		contour_algorithm_option.add_item("Marching Squares")
-		contour_algorithm_option.selected = 0
+		for algo_info in _contour_algorithms:
+			contour_algorithm_option.add_item(algo_info.display_name)
+		if _contour_algorithms.size() > 0:
+			contour_algorithm_option.selected = 0
 
 	if pre_simp_algorithm_option:
 		pre_simp_algorithm_option.clear()
-		pre_simp_algorithm_option.add_item("Ramer-Douglas-Peucker")
-		pre_simp_algorithm_option.add_item("Reumann-Witkam")
-		pre_simp_algorithm_option.add_item("Visvalingam-Whyatt")
-		pre_simp_algorithm_option.selected = 0
+		for algo_info in _polysimp_algorithms:
+			pre_simp_algorithm_option.add_item(algo_info.display_name)
+		if _polysimp_algorithms.size() > 0:
+			pre_simp_algorithm_option.selected = 0
 
 	if smooth_algorithm_option:
 		smooth_algorithm_option.clear()
-		smooth_algorithm_option.add_item("Outward Smooth")
-		smooth_algorithm_option.selected = 0
+		for algo_info in _smooth_algorithms:
+			smooth_algorithm_option.add_item(algo_info.display_name)
+		if _smooth_algorithms.size() > 0:
+			smooth_algorithm_option.selected = 0
 
 	if post_simp_algorithm_option:
 		post_simp_algorithm_option.clear()
-		post_simp_algorithm_option.add_item("Ramer-Douglas-Peucker")
-		post_simp_algorithm_option.add_item("Reumann-Witkam")
-		post_simp_algorithm_option.add_item("Visvalingam-Whyatt")
-		post_simp_algorithm_option.selected = 0
+		for algo_info in _polysimp_algorithms:
+			post_simp_algorithm_option.add_item(algo_info.display_name)
+		if _polysimp_algorithms.size() > 0:
+			post_simp_algorithm_option.selected = 0
 
-	# Setup sliders
-	if alpha_threshold_slider:
-		alpha_threshold_slider.min_value = 0.0
-		alpha_threshold_slider.max_value = 1.0
-		alpha_threshold_slider.value = 0.5
-		alpha_threshold_slider.step = 0.01
-
-	if max_resolution_slider:
-		max_resolution_slider.min_value = 0
-		max_resolution_slider.max_value = 4096
-		max_resolution_slider.value = 0
-		max_resolution_slider.step = 64
-
+	# Setup mesh settings sliders
 	if depth_slider:
 		depth_slider.min_value = 0.01
 		depth_slider.max_value = 1.0
@@ -293,33 +282,26 @@ func _setup_ui():
 	_update_value_labels()
 
 func _setup_algorithms():
-	# Create default algorithms
-	contour_algorithm = preload("res://addons/cutout/resources/contour/cutout_contour_moore_neighbour.gd").new()
-	if alpha_threshold_slider:
-		contour_algorithm.alpha_threshold = alpha_threshold_slider.value
-	else:
-		contour_algorithm.alpha_threshold = 0.5  # Default value
+	# Create default algorithms from discovered registry (first available)
+	if _contour_algorithms.size() > 0:
+		contour_algorithm = _contour_algorithms[0].create_instance()
 
-	if max_resolution_slider:
-		contour_algorithm.max_resolution = int(max_resolution_slider.value)
-	else:
-		contour_algorithm.max_resolution = 0  # Default value (no downscaling)
+	if _polysimp_algorithms.size() > 0:
+		pre_simp_algorithm = _polysimp_algorithms[0].create_instance()
+		post_simp_algorithm = _polysimp_algorithms[0].create_instance()
 
-	pre_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_rdp.gd").new()
-	pre_simp_algorithm.epsilon = 2.0
-
-	smooth_algorithm = preload("res://addons/cutout/resources/smooth/cutout_smooth_outward.gd").new()
-	smooth_algorithm.smooth_strength = 0.5
-	smooth_algorithm.iterations = 1
-
-	post_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_rdp.gd").new()
-	post_simp_algorithm.epsilon = 1.0
+	if _smooth_algorithms.size() > 0:
+		smooth_algorithm = _smooth_algorithms[0].create_instance()
 
 	# Defer parameter UI initialization to ensure containers are ready
 	call_deferred("_initialize_parameter_ui")
 
 func _initialize_parameter_ui():
 	# Initialize parameter UI for all algorithms - they're always visible now
+	# Contour parameters
+	if contour_params and contour_algorithm:
+		_update_algorithm_params(contour_params, contour_algorithm)
+
 	# Pre-simplification parameters
 	if pre_simp_params and pre_simp_algorithm:
 		_update_algorithm_params(pre_simp_params, pre_simp_algorithm)
@@ -437,12 +419,6 @@ func _connect_signals():
 	# Connect UI signals
 	if image_selector_button:
 		image_selector_button.pressed.connect(_on_image_selector_pressed)
-
-	if alpha_threshold_slider:
-		alpha_threshold_slider.value_changed.connect(_on_alpha_threshold_changed)
-
-	if max_resolution_slider:
-		max_resolution_slider.value_changed.connect(_on_max_resolution_changed)
 
 	if contour_algorithm_option:
 		contour_algorithm_option.item_selected.connect(_on_contour_algorithm_changed)
@@ -644,52 +620,28 @@ func _fit_3d_camera() -> void:
 	orbit_camera_3d.fit_to_bounds(bounds.size, center)
 
 
-func _on_alpha_threshold_changed(value: float):
-	if contour_algorithm:
-		contour_algorithm.alpha_threshold = value
-	_mark_dirty("contour")
-	_run_pipeline()
-	_update_value_labels()
-
-func _on_max_resolution_changed(value: float):
-	if contour_algorithm:
-		contour_algorithm.max_resolution = int(value)
-	_mark_dirty("contour")
-	_run_pipeline()
-	_update_value_labels()
-
 func _on_contour_algorithm_changed(index: int):
-	match index:
-		0:  # Moore Neighbour
-			contour_algorithm = preload("res://addons/cutout/resources/contour/cutout_contour_moore_neighbour.gd").new()
-		1:  # Marching Squares
-			contour_algorithm = preload("res://addons/cutout/resources/contour/cutout_contour_marching_squares.gd").new()
+	if index < 0 or index >= _contour_algorithms.size():
+		return
 
-	if alpha_threshold_slider:
-		contour_algorithm.alpha_threshold = alpha_threshold_slider.value
-	else:
-		contour_algorithm.alpha_threshold = 0.5  # Default value
-
-	if max_resolution_slider:
-		contour_algorithm.max_resolution = int(max_resolution_slider.value)
-	else:
-		contour_algorithm.max_resolution = 0  # Default value
+	contour_algorithm = _contour_algorithms[index].create_instance()
+	if not contour_algorithm:
+		return
 
 	contour_algorithm.changed.connect(func(): _mark_dirty("contour"); _run_pipeline())
+	_update_algorithm_params(contour_params, contour_algorithm)
 	_mark_dirty("contour")
 	_run_pipeline()
 
 # Pre-simplification toggle removed - always enabled
 
 func _on_pre_simp_algorithm_changed(index: int):
-	match index:
-		0:  # RDP
-			pre_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_rdp.gd").new()
-			pre_simp_algorithm.epsilon = 2.0
-		1:  # RW
-			pre_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_rw.gd").new()
-		2:  # VW
-			pre_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_vw.gd").new()
+	if index < 0 or index >= _polysimp_algorithms.size():
+		return
+
+	pre_simp_algorithm = _polysimp_algorithms[index].create_instance()
+	if not pre_simp_algorithm:
+		return
 
 	pre_simp_algorithm.changed.connect(func(): _mark_dirty("pre_simp"); _run_pipeline())
 	_update_algorithm_params(pre_simp_params, pre_simp_algorithm)
@@ -699,11 +651,12 @@ func _on_pre_simp_algorithm_changed(index: int):
 # Smoothing toggle removed - always enabled
 
 func _on_smooth_algorithm_changed(index: int):
-	match index:
-		0:  # Outward Smooth
-			smooth_algorithm = preload("res://addons/cutout/resources/smooth/cutout_smooth_outward.gd").new()
-			smooth_algorithm.smooth_strength = 0.5
-			smooth_algorithm.iterations = 1
+	if index < 0 or index >= _smooth_algorithms.size():
+		return
+
+	smooth_algorithm = _smooth_algorithms[index].create_instance()
+	if not smooth_algorithm:
+		return
 
 	smooth_algorithm.changed.connect(func(): _mark_dirty("smooth"); _run_pipeline())
 	_update_algorithm_params(smooth_params, smooth_algorithm)
@@ -713,14 +666,12 @@ func _on_smooth_algorithm_changed(index: int):
 # Post-simplification toggle removed - always enabled
 
 func _on_post_simp_algorithm_changed(index: int):
-	match index:
-		0:  # RDP
-			post_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_rdp.gd").new()
-			post_simp_algorithm.epsilon = 1.0
-		1:  # RW
-			post_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_rw.gd").new()
-		2:  # VW
-			post_simp_algorithm = preload("res://addons/cutout/resources/polysimp/cutout_polysimp_vw.gd").new()
+	if index < 0 or index >= _polysimp_algorithms.size():
+		return
+
+	post_simp_algorithm = _polysimp_algorithms[index].create_instance()
+	if not post_simp_algorithm:
+		return
 
 	post_simp_algorithm.changed.connect(func(): _mark_dirty("post_simp"); _run_pipeline())
 	_update_algorithm_params(post_simp_params, post_simp_algorithm)
@@ -861,14 +812,6 @@ func _on_mesh_size_changed(_value: float):
 	_update_3d_preview()
 
 func _update_value_labels():
-	if alpha_threshold_value and alpha_threshold_slider:
-		alpha_threshold_value.text = "%.2f" % alpha_threshold_slider.value
-	if max_resolution_value and max_resolution_slider:
-		var val = int(max_resolution_slider.value)
-		if val == 0:
-			max_resolution_value.text = "Off"
-		else:
-			max_resolution_value.text = "%d" % val
 	if depth_value and depth_slider:
 		depth_value.text = "%.2f" % depth_slider.value
 

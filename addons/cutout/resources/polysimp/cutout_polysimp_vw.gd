@@ -11,6 +11,8 @@ extends CutoutPolysimpAlgorithm
 ##
 ## WINDING ORDER: Preserves the input polygon's winding order (CW or CCW).
 
+const DISPLAY_NAME := "Visvalingam-Whyatt"
+
 ## Stopping criteria for the simplification algorithm.
 enum StoppingCriteria {
 	PROPORTION, ## Keep a proportion (0.0-1.0) of the original points

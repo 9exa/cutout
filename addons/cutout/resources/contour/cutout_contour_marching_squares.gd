@@ -8,6 +8,8 @@ class_name CutoutContourMarchingSquares
 ## WINDING ORDER: Produces clockwise (CW) polygons consistent with Godot's
 ## convention where CW = solid and CCW = hole.
 
+const DISPLAY_NAME := "Marching Squares"
+
 # Edge Indices for marching squares
 const EDGE_TOP    = 0
 const EDGE_RIGHT  = 1

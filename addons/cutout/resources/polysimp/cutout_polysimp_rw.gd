@@ -11,6 +11,8 @@ extends CutoutPolysimpAlgorithm
 ##
 ## WINDING ORDER: Preserves the input polygon's winding order (CW or CCW).
 
+const DISPLAY_NAME := "Reumann-Witkam"
+
 ## Distance threshold for the corridor width.
 ## Points within epsilon perpendicular distance from the current line segment
 ## will be removed. Higher values result in more aggressive simplification.

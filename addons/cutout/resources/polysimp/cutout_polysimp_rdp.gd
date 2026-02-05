@@ -12,6 +12,8 @@ extends CutoutPolysimpAlgorithm
 ##
 ## WINDING ORDER: Preserves the input polygon's winding order (CW or CCW).
 
+const DISPLAY_NAME := "Ramer-Douglas-Peucker"
+
 ## Distance threshold for point removal.
 ## Points with perpendicular distance less than epsilon from the simplified
 ## line segment will be removed. Higher values result in more aggressive

@@ -13,6 +13,8 @@ class_name CutoutSmoothOutward
 ## WINDING ORDER: Assumes clockwise (CW) polygon winding, consistent with Godot's
 ## convention where CW = solid and CCW = hole.
 
+const DISPLAY_NAME := "Outward Smooth"
+
 ## Expansion radius in pixels. The polygon is first expanded outward by this amount
 ## to create a safety margin before smoothing. Higher values ensure better containment
 ## but may create larger polygons.

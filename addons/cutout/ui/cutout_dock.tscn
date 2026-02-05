@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://bqxvqn7jdyxvl"]
+[gd_scene load_steps=7 format=3 uid="uid://bqxvqn7jdyxvl"]
 
 [ext_resource type="Script" uid="uid://bdc537hr71e7k" path="res://addons/cutout/ui/cutout_dock.gd" id="1"]
 [ext_resource type="Script" uid="uid://bngtnfq0t4qwk" path="res://addons/cutout/ui/polygon_preview.gd" id="2_w6wls"]
@@ -6,7 +6,9 @@
 [ext_resource type="Script" uid="uid://ch5tenxhnu2jo" path="res://addons/cutout/ui/orbit_camera_3d.gd" id="4_orbit_camera"]
 [ext_resource type="Script" uid="uid://lvoch82ltgq4" path="res://addons/cutout/ui/pan_zoom_camera_2d.gd" id="5_pan_zoom"]
 
-[node name="CutoutDock" type="VBoxContainer" node_paths=PackedStringArray("image_selector_button", "image_path_label", "contour_section", "contour_section_button", "contour_section_content", "contour_algorithm_option", "alpha_threshold_slider", "alpha_threshold_value", "max_resolution_slider", "max_resolution_value", "pre_simp_section", "pre_simp_section_button", "pre_simp_section_content", "pre_simp_algorithm_option", "pre_simp_params", "smooth_section", "smooth_section_button", "smooth_section_content", "smooth_algorithm_option", "smooth_params", "post_simp_section", "post_simp_section_button", "post_simp_section_content", "post_simp_algorithm_option", "post_simp_params", "preview_tab_container", "preview_container_2d", "preview_viewport_2d", "preview_camera_2d", "polygon_preview", "preview_container_3d", "preview_viewport_3d", "mesh_preview_3d", "orbit_camera_3d", "mesh_settings_section", "mesh_settings_button", "mesh_settings_content", "depth_slider", "depth_value", "mesh_width_spinbox", "mesh_height_spinbox", "export_button", "export_path_line")]
+[sub_resource type="World3D" id="World3D_preview"]
+
+[node name="CutoutDock" type="VBoxContainer" node_paths=PackedStringArray("image_selector_button", "image_path_label", "contour_section", "contour_section_button", "contour_section_content", "contour_algorithm_option", "contour_params", "pre_simp_section", "pre_simp_section_button", "pre_simp_section_content", "pre_simp_algorithm_option", "pre_simp_params", "smooth_section", "smooth_section_button", "smooth_section_content", "smooth_algorithm_option", "smooth_params", "post_simp_section", "post_simp_section_button", "post_simp_section_content", "post_simp_algorithm_option", "post_simp_params", "preview_tab_container", "preview_container_2d", "preview_viewport_2d", "preview_camera_2d", "polygon_preview", "preview_container_3d", "preview_viewport_3d", "mesh_preview_3d", "orbit_camera_3d", "mesh_settings_section", "mesh_settings_button", "mesh_settings_content", "depth_slider", "depth_value", "mesh_width_spinbox", "mesh_height_spinbox", "export_button", "export_path_line")]
 anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 454.0
@@ -18,10 +20,7 @@ contour_section = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourS
 contour_section_button = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionButton")
 contour_section_content = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent")
 contour_algorithm_option = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlgorithmSelector/OptionButton")
-alpha_threshold_slider = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold/HSlider")
-alpha_threshold_value = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold/Value")
-max_resolution_slider = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/MaxResolution/HSlider")
-max_resolution_value = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/MaxResolution/Value")
+contour_params = NodePath("HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/Parameters")
 pre_simp_section = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection")
 pre_simp_section_button = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionButton")
 pre_simp_section_content = NodePath("HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent")
@@ -131,51 +130,9 @@ text = "Algorithm:"
 [node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlgorithmSelector"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-selected = 0
-item_count = 2
-popup/item_0/text = "Moore Neighbour"
-popup/item_0/id = 0
-popup/item_1/text = "Marching Squares"
-popup/item_1/id = 1
 
-[node name="AlphaThreshold" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent"]
+[node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent"]
 layout_mode = 2
-
-[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold"]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-text = "Alpha Threshold:"
-
-[node name="HSlider" type="HSlider" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold"]
-custom_minimum_size = Vector2(120, 0)
-layout_mode = 2
-max_value = 1.0
-step = 0.01
-value = 0.5
-
-[node name="Value" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/AlphaThreshold"]
-custom_minimum_size = Vector2(40, 0)
-layout_mode = 2
-text = "0.50"
-
-[node name="MaxResolution" type="HBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/MaxResolution"]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-text = "Max Resolution:"
-
-[node name="HSlider" type="HSlider" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/MaxResolution"]
-custom_minimum_size = Vector2(120, 0)
-layout_mode = 2
-max_value = 4096.0
-step = 64.0
-
-[node name="Value" type="Label" parent="HBoxContainer/VBoxContainer/PipelineSection/ContourSection/ContourSectionContent/MaxResolution"]
-custom_minimum_size = Vector2(40, 0)
-layout_mode = 2
-text = "Off"
 
 [node name="PreSimpSection" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection"]
 layout_mode = 2
@@ -205,14 +162,6 @@ text = "Algorithm:"
 [node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent/AlgorithmSelector"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-selected = 0
-item_count = 3
-popup/item_0/text = "Ramer-Douglas-Peucker"
-popup/item_0/id = 0
-popup/item_1/text = "Reumann-Witkam"
-popup/item_1/id = 1
-popup/item_2/text = "Visvalingam-Whyatt"
-popup/item_2/id = 2
 
 [node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PreSimpSection/PreSimpSectionContent"]
 layout_mode = 2
@@ -245,10 +194,6 @@ text = "Algorithm:"
 [node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent/AlgorithmSelector"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-selected = 0
-item_count = 1
-popup/item_0/text = "Outward Smooth"
-popup/item_0/id = 0
 
 [node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/SmoothSection/SmoothSectionContent"]
 layout_mode = 2
@@ -281,14 +226,6 @@ text = "Algorithm:"
 [node name="OptionButton" type="OptionButton" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent/AlgorithmSelector"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
-selected = 0
-item_count = 3
-popup/item_0/text = "Ramer-Douglas-Peucker"
-popup/item_0/id = 0
-popup/item_1/text = "Reumann-Witkam"
-popup/item_1/id = 1
-popup/item_2/text = "Visvalingam-Whyatt"
-popup/item_2/id = 2
 
 [node name="Parameters" type="VBoxContainer" parent="HBoxContainer/VBoxContainer/PipelineSection/PostSimpSection/PostSimpSectionContent"]
 layout_mode = 2
@@ -434,6 +371,8 @@ stretch = true
 metadata/_tab_index = 1
 
 [node name="SubViewport3D" type="SubViewport" parent="HBoxContainer/PreviewSection/PreviewTabs/3D"]
+own_world_3d = true
+world_3d = SubResource("World3D_preview")
 handle_input_locally = false
 size = Vector2i(2, 2)
 render_target_update_mode = 0

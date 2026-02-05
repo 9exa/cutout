@@ -6,6 +6,8 @@ extends CutoutContourAlgorithm
 ## WINDING ORDER: Produces clockwise (CW) polygons, consistent with Godot's
 ## convention where CW = solid and CCW = hole.
 
+const DISPLAY_NAME := "Moore Neighbour"
+
 # Moore neighborhood directions (clockwise from west)
 const DIRECTIONS = [
 	Vector2i(-1, 0),  # 0: W
