@@ -2,266 +2,219 @@
 extends CutoutContourAlgorithm
 class_name CutoutContourMarchingSquares
 
-## Optimized marching squares algorithm for extracting contours from images.
-## Uses single-pass edge detection and efficient contour tracing.
+## Marching squares algorithm for extracting contours from images.
 ##
-## WINDING ORDER: Produces clockwise (CW) polygons consistent with Godot's
-## convention where CW = solid and CCW = hole.
+## WINDING ORDER: CW = solid/filled polygon, CCW = hole.
+## This implementation produces CW contours for solid regions.
 
 const DISPLAY_NAME := "Marching Squares"
 
-# Edge Indices for marching squares
-const EDGE_TOP    = 0
-const EDGE_RIGHT  = 1
+# Edge indices (clockwise around cell)
+const EDGE_TOP = 0
+const EDGE_RIGHT = 1
 const EDGE_BOTTOM = 2
-const EDGE_LEFT   = 3
+const EDGE_LEFT = 3
 
 # Marching squares lookup table
-# Each configuration maps to edge connections
-const MARCHING_SQUARES_TABLE = [
-	[],                     # 0: empty
-	[[3, 2]],              # 1: bottom-left corner
-	[[2, 1]],              # 2: bottom-right corner
-	[[3, 1]],              # 3: bottom edge
-	[[1, 0]],              # 4: top-right corner
-	[[3, 2], [1, 0]],      # 5: diagonal (saddle point)
-	[[2, 0]],              # 6: right edge
-	[[3, 0]],              # 7: top-right filled
-	[[0, 3]],              # 8: top-left corner
-	[[0, 2]],              # 9: left edge
-	[[0, 3], [2, 1]],      # 10: diagonal (saddle point)
-	[[0, 1]],              # 11: top-left filled
-	[[1, 3]],              # 12: top edge
-	[[1, 2]],              # 13: bottom-left filled
-	[[2, 3]],              # 14: top-left filled
-	[]                      # 15: full
+# Cell corners: bit0=top-left, bit1=top-right, bit2=bottom-right, bit3=bottom-left
+#
+# For CW winding (solid on right side of travel):
+# - We trace the boundary with solid pixels on our right
+# - Segment goes from one edge midpoint to another
+#
+# Cell layout:
+#   TL---TOP---TR
+#   |          |
+#  LEFT      RIGHT
+#   |          |
+#   BL--BOTTOM-BR
+
+const EDGE_TABLE = [
+	[],                          # 0:  0000 - empty (no boundary)
+	[[EDGE_TOP, EDGE_LEFT]],     # 1:  0001 - TL solid
+	[[EDGE_RIGHT, EDGE_TOP]],    # 2:  0010 - TR solid
+	[[EDGE_RIGHT, EDGE_LEFT]],   # 3:  0011 - TL+TR solid (top half)
+	[[EDGE_BOTTOM, EDGE_RIGHT]], # 4:  0100 - BR solid
+	[[EDGE_TOP, EDGE_LEFT], [EDGE_BOTTOM, EDGE_RIGHT]],  # 5: TL+BR saddle
+	[[EDGE_BOTTOM, EDGE_TOP]],   # 6:  0110 - TR+BR solid (right half)
+	[[EDGE_BOTTOM, EDGE_LEFT]],  # 7:  0111 - TL+TR+BR solid
+	[[EDGE_LEFT, EDGE_BOTTOM]],  # 8:  1000 - BL solid
+	[[EDGE_TOP, EDGE_BOTTOM]],   # 9:  1001 - TL+BL solid (left half)
+	[[EDGE_RIGHT, EDGE_TOP], [EDGE_LEFT, EDGE_BOTTOM]],  # 10: TR+BL saddle
+	[[EDGE_RIGHT, EDGE_BOTTOM]], # 11: 1011 - TL+TR+BL solid
+	[[EDGE_LEFT, EDGE_RIGHT]],   # 12: 1100 - BR+BL solid (bottom half)
+	[[EDGE_LEFT, EDGE_TOP]],     # 13: 1101 - TL+BR+BL solid
+	[[EDGE_TOP, EDGE_RIGHT]],    # 14: 1110 - TR+BR+BL solid
+	[]                           # 15: 1111 - full (no boundary)
 ]
 
-# Direction vectors for neighbor checking (clockwise from top)
-const DIRECTIONS = [
-	Vector2i(0, -1),  # Top
-	Vector2i(1, 0),   # Right
-	Vector2i(0, 1),   # Bottom
-	Vector2i(-1, 0)   # Left
-]
 
 func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
-	# Prepare image for BitMap (must be LA8 and uncompressed)
-	var converted_image := image.duplicate()
-	if converted_image.is_compressed():
-		converted_image.decompress()
-	converted_image.convert(Image.FORMAT_LA8)
+	var converted := image.duplicate()
+	if converted.is_compressed():
+		converted.decompress()
+	converted.convert(Image.FORMAT_LA8)
 
 	var bitmap := BitMap.new()
-	bitmap.create_from_image_alpha(converted_image, alpha_threshold)
+	bitmap.create_from_image_alpha(converted, alpha_threshold)
 
-	return _marching_squares_optimized(bitmap)
-
-
-## Optimized marching squares with single-pass edge detection
-static func _marching_squares_optimized(bitmap: BitMap) -> Array[PackedVector2Array]:
 	var size := bitmap.get_size()
+	if size.x < 2 or size.y < 2:
+		return []
+
+	# Step 1: Generate all edge segments
+	var segments := _generate_segments(bitmap, size)
+	if segments.is_empty():
+		return []
+
+	# Step 2: Chain segments into closed contours
+	var contours := _chain_segments(segments)
+
+	return contours
+
+
+## Generate edge segments for all cells
+func _generate_segments(bitmap: BitMap, size: Vector2i) -> Array:
+	var segments := []
+
+	# Cells are between pixels, so we iterate to size-1
+	for cy in range(size.y - 1):
+		for cx in range(size.x - 1):
+			var config := _get_config(bitmap, cx, cy)
+
+			# Skip empty and full cells
+			if config == 0 or config == 15:
+				continue
+
+			# Get edge pairs for this configuration
+			var edge_pairs: Array = EDGE_TABLE[config]
+
+			for pair in edge_pairs:
+				var p1 := _edge_to_point(cx, cy, pair[0])
+				var p2 := _edge_to_point(cx, cy, pair[1])
+				segments.append([p1, p2])
+
+	return segments
+
+
+## Get the 4-bit configuration for a cell
+## Cell (cx, cy) has corners at pixels:
+##   top-left: (cx, cy), top-right: (cx+1, cy)
+##   bottom-left: (cx, cy+1), bottom-right: (cx+1, cy+1)
+func _get_config(bitmap: BitMap, cx: int, cy: int) -> int:
+	var config := 0
+	if bitmap.get_bit(cx, cy):         # top-left
+		config |= 1
+	if bitmap.get_bit(cx + 1, cy):     # top-right
+		config |= 2
+	if bitmap.get_bit(cx + 1, cy + 1): # bottom-right
+		config |= 4
+	if bitmap.get_bit(cx, cy + 1):     # bottom-left
+		config |= 8
+	return config
+
+
+## Convert edge index to point coordinate (midpoint of cell edge)
+func _edge_to_point(cx: int, cy: int, edge: int) -> Vector2:
+	match edge:
+		EDGE_TOP:
+			return Vector2(cx + 0.5, cy)
+		EDGE_RIGHT:
+			return Vector2(cx + 1, cy + 0.5)
+		EDGE_BOTTOM:
+			return Vector2(cx + 0.5, cy + 1)
+		EDGE_LEFT:
+			return Vector2(cx, cy + 0.5)
+	return Vector2(cx + 0.5, cy + 0.5)
+
+
+## Chain segments into closed contours
+func _chain_segments(segments: Array) -> Array[PackedVector2Array]:
 	var contours: Array[PackedVector2Array] = []
 
-	# Early exit for empty images
-	if size.x == 0 or size.y == 0:
+	if segments.is_empty():
 		return contours
 
-	# Create visited bitmap to track processed cells
-	# Note: This persists across all contours to prevent re-processing shared edges
-	var visited := {}  # Use dictionary with integer keys for speed
+	# Build adjacency map: point_key -> list of {segment_idx, is_start}
+	var adjacency := {}
 
-	# Single pass: Find all starting points at once
-	var edge_points := []
+	for i in range(segments.size()):
+		var seg = segments[i]
+		var key0 := _point_key(seg[0])
+		var key1 := _point_key(seg[1])
 
-	# Scan only the perimeter first (most edge pixels are on boundaries)
-	for x in range(size.x):
-		if bitmap.get_bit(x, 0):
-			edge_points.append(Vector2i(x, 0))
-		if size.y > 1 and bitmap.get_bit(x, size.y - 1):
-			edge_points.append(Vector2i(x, size.y - 1))
+		if not adjacency.has(key0):
+			adjacency[key0] = []
+		adjacency[key0].append({"idx": i, "start": true})
 
-	for y in range(1, size.y - 1):
-		if bitmap.get_bit(0, y):
-			edge_points.append(Vector2i(0, y))
-		if size.x > 1 and bitmap.get_bit(size.x - 1, y):
-			edge_points.append(Vector2i(size.x - 1, y))
+		if not adjacency.has(key1):
+			adjacency[key1] = []
+		adjacency[key1].append({"idx": i, "start": false})
 
-	# Then scan interior with adaptive step size to catch thin features
-	for y in range(1, size.y - 1):
-		# Use adaptive scanning: step=2 normally, but step=1 near detected edges
-		var x := 1
-		while x < size.x - 1:
-			if bitmap.get_bit(x, y) and _is_edge_pixel_fast(bitmap, x, y, size):
-				edge_points.append(Vector2i(x, y))
-				# Switch to step=1 for next few pixels to catch thin features
-				x += 1
-			else:
-				# No edge here, can skip ahead
-				x += 2
+	var used := {}
 
-	# Process each edge point
-	for point in edge_points:
-		# Bounds check: Can't create cell from pixels at position 0
-		if point.x == 0 or point.y == 0:
+	# Build contours by chaining segments
+	for start_idx in range(segments.size()):
+		if used.has(start_idx):
 			continue
 
-		var cell_x: int = point.x - 1
-		var cell_y: int = point.y - 1
+		var contour := PackedVector2Array()
+		var seg = segments[start_idx]
 
-		# Check if this cell has already been processed
-		var cell_key := _pack_key(cell_x, cell_y)
-		if visited.has(cell_key):
-			continue
+		contour.append(seg[0])
+		contour.append(seg[1])
+		used[start_idx] = true
 
-		# Trace the contour from this cell
-		var contour := _trace_contour_optimized(bitmap, cell_x, cell_y, size, visited)
-		if contour.size() >= 3:  # Minimum valid closed contour (triangle)
-			# Ensure clockwise winding order (CW = solid, CCW = hole)
-			_normalize_winding_order(contour)
+		var current_point: Vector2 = seg[1]
+		var start_point: Vector2 = seg[0]
+
+		# Follow chain until we close or get stuck
+		for _iter in range(segments.size()):
+			if _points_equal(current_point, start_point):
+				break
+
+			var key := _point_key(current_point)
+			var found := false
+
+			if adjacency.has(key):
+				for entry in adjacency[key]:
+					if used.has(entry["idx"]):
+						continue
+
+					var next_seg = segments[entry["idx"]]
+					var next_point: Vector2
+
+					if entry["start"]:
+						next_point = next_seg[1]
+					else:
+						next_point = next_seg[0]
+
+					contour.append(next_point)
+					current_point = next_point
+					used[entry["idx"]] = true
+					found = true
+					break
+
+			if not found:
+				break
+
+		# Clean up: remove duplicate closing point
+		if contour.size() > 2 and _points_equal(contour[contour.size() - 1], contour[0]):
+			contour.remove_at(contour.size() - 1)
+
+		if contour.size() >= 3:
 			contours.append(contour)
 
 	return contours
 
 
-## Normalize contour to clockwise winding order using shoelace formula
-static func _normalize_winding_order(contour: PackedVector2Array) -> void:
-	if contour.size() < 3:
-		return
-
-	# Calculate signed area using shoelace formula
-	# Positive area = counter-clockwise, Negative = clockwise
-	var signed_area := 0.0
-	var n := contour.size()
-	for i in range(n):
-		var j := (i + 1) % n
-		signed_area += contour[i].x * contour[j].y
-		signed_area -= contour[j].x * contour[i].y
-
-	# If counter-clockwise (positive area), reverse to make clockwise
-	if signed_area > 0:
-		contour.reverse()
+## Hash a point to an integer key
+func _point_key(p: Vector2) -> int:
+	var x := int(p.x * 2)
+	var y := int(p.y * 2)
+	return x * 100000 + y
 
 
-## Fast edge pixel check (inline for performance)
-static func _is_edge_pixel_fast(bitmap: BitMap, x: int, y: int, size: Vector2i) -> bool:
-	# Check 4-neighbors in one pass
-	return (x > 0 and not bitmap.get_bit(x - 1, y)) or \
-		   (x < size.x - 1 and not bitmap.get_bit(x + 1, y)) or \
-		   (y > 0 and not bitmap.get_bit(x, y - 1)) or \
-		   (y < size.y - 1 and not bitmap.get_bit(x, y + 1))
-
-
-## Optimized contour tracing with integer key tracking
-static func _trace_contour_optimized(bitmap: BitMap, start_x: int, start_y: int, size: Vector2i, visited: Dictionary) -> PackedVector2Array:
-	var contour := PackedVector2Array()
-	var x := start_x
-	var y := start_y
-
-	# Use pre-allocated capacity hint
-	contour.resize(0)  # Clear but keep capacity
-
-	var start_key := _pack_key(x, y)
-	var iterations := 0
-	var max_iterations := size.x * size.y  # Safety limit (reduced from 4x)
-
-	while iterations < max_iterations:
-		iterations += 1
-
-		# Pack coordinates into single integer for fast lookup
-		var cell_key := _pack_key(x, y)
-
-		# Check if we've completed the loop
-		if iterations > 1 and cell_key == start_key:
-			break
-
-		# Mark cell as visited
-		visited[cell_key] = true
-
-		# Get marching squares configuration
-		var config := _get_config_fast(bitmap, x, y, size)
-
-		# Skip empty or full cells
-		if config == 0 or config == 15:
-			break
-
-		# Get edges for this configuration
-		var edges: Array = MARCHING_SQUARES_TABLE[config]
-		if edges.is_empty():
-			break
-
-		# Process first edge pair only (avoid complex saddle point logic)
-		var edge_pair = edges[0]
-		if edge_pair.size() >= 2:
-			# Add edge points
-			var p1 := _get_edge_point_fast(x, y, edge_pair[0])
-			var p2 := _get_edge_point_fast(x, y, edge_pair[1])
-
-			# Add points efficiently
-			if contour.is_empty():
-				contour.append(p1)
-				contour.append(p2)
-			else:
-				# Only add the connecting point
-				var last := contour[contour.size() - 1]
-				if last.distance_squared_to(p1) < 0.01:  # Use squared distance
-					contour.append(p2)
-				elif last.distance_squared_to(p2) < 0.01:
-					contour.append(p1)
-				else:
-					# Disconnected - shouldn't happen in valid contour
-					break
-
-			# Move to next cell based on exit edge
-			var exit_edge = edge_pair[1]
-			match exit_edge:
-				EDGE_TOP:    y -= 1
-				EDGE_RIGHT:  x += 1
-				EDGE_BOTTOM: y += 1
-				EDGE_LEFT:   x -= 1
-				_: break
-		else:
-			break
-
-	# Remove duplicate end point if it exists
-	if contour.size() > 1 and contour[contour.size() - 1].distance_squared_to(contour[0]) < 0.01:
-		contour.remove_at(contour.size() - 1)
-
-	return contour
-
-
-## Pack x,y coordinates into a single integer for fast dictionary lookup
-static func _pack_key(x: int, y: int) -> int:
-	# Assumes coordinates are < 65536 (which is reasonable for images)
-	return (x << 16) | (y & 0xFFFF)
-
-
-## Fast configuration calculation with cached bounds checking
-static func _get_config_fast(bitmap: BitMap, x: int, y: int, size: Vector2i) -> int:
-	var config := 0
-
-	# Inline the checks for speed
-	# Bottom-left (bit 0)
-	if y + 1 < size.y and x >= 0 and x < size.x and bitmap.get_bit(x, y + 1):
-		config |= 1
-	# Bottom-right (bit 1)
-	if y + 1 < size.y and x + 1 < size.x and bitmap.get_bit(x + 1, y + 1):
-		config |= 2
-	# Top-right (bit 2)
-	if y >= 0 and y < size.y and x + 1 < size.x and bitmap.get_bit(x + 1, y):
-		config |= 4
-	# Top-left (bit 3)
-	if y >= 0 and y < size.y and x >= 0 and x < size.x and bitmap.get_bit(x, y):
-		config |= 8
-
-	return config
-
-
-## Fast edge point calculation (inline the common operations)
-static func _get_edge_point_fast(cell_x: int, cell_y: int, edge: int) -> Vector2:
-	match edge:
-		EDGE_TOP:    return Vector2(cell_x + 0.5, cell_y)
-		EDGE_RIGHT:  return Vector2(cell_x + 1.0, cell_y + 0.5)
-		EDGE_BOTTOM: return Vector2(cell_x + 0.5, cell_y + 1.0)
-		EDGE_LEFT:   return Vector2(cell_x, cell_y + 0.5)
-		_:           return Vector2(cell_x + 0.5, cell_y + 0.5)
+## Check point equality with tolerance
+func _points_equal(a: Vector2, b: Vector2) -> bool:
+	return a.distance_squared_to(b) < 0.001
