@@ -112,12 +112,79 @@ var section_states: Dictionary = {
 func _ready():
 	if not _validate_ui_references():
 		push_error("CutoutDock: Missing UI references. Please assign all required nodes in the Inspector.")
+		push_error("CutoutDock: The dock will not function properly. Check the scene setup in cutout_dock.tscn")
+		# Disable the dock to prevent further errors
+		set_process(false)
+		set_physics_process(false)
 		return
 
 	_setup_ui()
 	_setup_algorithms()
 	_setup_collapsible_sections()
 	_connect_signals()
+
+
+var _editor_interface: EditorInterface
+var _environment_applied := false
+
+
+## Called by the plugin to pass the EditorInterface
+func set_editor_interface(editor_interface: EditorInterface) -> void:
+	_editor_interface = editor_interface
+
+
+func _apply_editor_environment() -> void:
+	if _environment_applied or not _editor_interface:
+		return
+
+	if not preview_viewport_3d or not preview_viewport_3d.world_3d:
+		return
+
+	# Wait a frame to ensure the World3D scenario is fully initialized
+	await get_tree().process_frame
+
+	# Double-check viewport still exists after await
+	if not preview_viewport_3d or not preview_viewport_3d.world_3d:
+		return
+
+	# Get the 3D editor's environment
+	var editor_env := _get_editor_3d_environment(_editor_interface)
+
+	if editor_env:
+		# Duplicate the environment so we have our own copy
+		editor_env = editor_env.duplicate()
+
+		# Final safety check before setting
+		if preview_viewport_3d.world_3d and preview_viewport_3d.world_3d.scenario.is_valid():
+			preview_viewport_3d.world_3d.environment = editor_env
+			_environment_applied = true
+
+
+## Helper to get the 3D editor's environment
+func _get_editor_3d_environment(editor_interface: EditorInterface) -> Environment:
+	# Note: Accessing editor's default environment through settings is unreliable
+	# across Godot versions, so we create a consistent fallback environment instead.
+	# This ensures the 3D preview always has proper lighting regardless of editor state.
+
+	# Create a basic default environment with sky lighting
+	var default_env := Environment.new()
+	default_env.background_mode = Environment.BG_SKY
+	default_env.sky = Sky.new()
+	default_env.sky.sky_material = ProceduralSkyMaterial.new()
+	return default_env
+
+
+## Recursively find nodes of a specific type
+func _find_nodes_of_type(node: Node, type: String) -> Array[Node]:
+	var result: Array[Node] = []
+
+	if node.get_class() == type:
+		result.append(node)
+
+	for child in node.get_children():
+		result.append_array(_find_nodes_of_type(child, type))
+
+	return result
 
 # Mark a stage and all downstream stages as dirty
 func _mark_dirty(stage: String):
@@ -464,6 +531,10 @@ func _connect_signals():
 		preview_container_2d.gui_input.connect(_on_preview_2d_gui_input)
 	if preview_container_3d and orbit_camera_3d:
 		preview_container_3d.gui_input.connect(_on_preview_3d_gui_input)
+
+	# Connect tab change to apply editor environment when switching to 3D preview
+	if preview_tab_container:
+		preview_tab_container.tab_changed.connect(_on_preview_tab_changed)
 
 func _on_image_selector_pressed():
 	var file_dialog = FileDialog.new()
@@ -916,3 +987,9 @@ func _on_preview_2d_gui_input(event: InputEvent) -> void:
 func _on_preview_3d_gui_input(event: InputEvent) -> void:
 	if orbit_camera_3d:
 		orbit_camera_3d.handle_input(event)
+
+
+## Called when preview tab changes - apply editor environment when switching to 3D
+func _on_preview_tab_changed(tab: int) -> void:
+	if tab == 1:  # 3D preview tab
+		_apply_editor_environment()

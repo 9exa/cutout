@@ -1,206 +1,241 @@
 @tool
-extends CutoutContourAlgorithm
 class_name CutoutContourMarchingSquares
-
-## Marching squares algorithm for extracting contours from images.
+extends CutoutContourAlgorithm
+## Marching Squares algorithm for contour extraction from images.
 ##
-## WINDING ORDER: CW = solid/filled polygon, CCW = hole.
-## This implementation produces CW contours for solid regions.
+## Uses a segment-based approach: first generates all line segments,
+## then chains them into closed contours.
 
-const DISPLAY_NAME := "Marching Squares"
+# Edge constants for public API (used by tests)
+const EDGE_TOP := 0
+const EDGE_RIGHT := 1
+const EDGE_BOTTOM := 2
+const EDGE_LEFT := 3
 
-# Edge indices (clockwise around cell)
-const EDGE_TOP = 0
-const EDGE_RIGHT = 1
-const EDGE_BOTTOM = 2
-const EDGE_LEFT = 3
-
-# Marching squares lookup table
-# Cell corners: bit0=top-left, bit1=top-right, bit2=bottom-right, bit3=bottom-left
-#
-# For CW winding (solid on right side of travel):
-# - We trace the boundary with solid pixels on our right
-# - Segment goes from one edge midpoint to another
+# Segment lookup table for each of the 16 cases
+# Bit order: bit3=TL, bit2=TR, bit1=BR, bit0=BL
+# Each entry is an array of segments, where each segment is [edge_a, edge_b]
 #
 # Cell layout:
-#   TL---TOP---TR
-#   |          |
-#  LEFT      RIGHT
-#   |          |
-#   BL--BOTTOM-BR
-
-const EDGE_TABLE = [
-	[],                          # 0:  0000 - empty (no boundary)
-	[[EDGE_TOP, EDGE_LEFT]],     # 1:  0001 - TL solid
-	[[EDGE_RIGHT, EDGE_TOP]],    # 2:  0010 - TR solid
-	[[EDGE_RIGHT, EDGE_LEFT]],   # 3:  0011 - TL+TR solid (top half)
-	[[EDGE_BOTTOM, EDGE_RIGHT]], # 4:  0100 - BR solid
-	[[EDGE_TOP, EDGE_LEFT], [EDGE_BOTTOM, EDGE_RIGHT]],  # 5: TL+BR saddle
-	[[EDGE_BOTTOM, EDGE_TOP]],   # 6:  0110 - TR+BR solid (right half)
-	[[EDGE_BOTTOM, EDGE_LEFT]],  # 7:  0111 - TL+TR+BR solid
-	[[EDGE_LEFT, EDGE_BOTTOM]],  # 8:  1000 - BL solid
-	[[EDGE_TOP, EDGE_BOTTOM]],   # 9:  1001 - TL+BL solid (left half)
-	[[EDGE_RIGHT, EDGE_TOP], [EDGE_LEFT, EDGE_BOTTOM]],  # 10: TR+BL saddle
-	[[EDGE_RIGHT, EDGE_BOTTOM]], # 11: 1011 - TL+TR+BL solid
-	[[EDGE_LEFT, EDGE_RIGHT]],   # 12: 1100 - BR+BL solid (bottom half)
-	[[EDGE_LEFT, EDGE_TOP]],     # 13: 1101 - TL+BR+BL solid
-	[[EDGE_TOP, EDGE_RIGHT]],    # 14: 1110 - TR+BR+BL solid
-	[]                           # 15: 1111 - full (no boundary)
+#   TL ---TOP--- TR
+#   |            |
+#  LEFT        RIGHT
+#   |            |
+#   BL --BOTTOM-- BR
+#
+const SEGMENT_TABLE := [
+	[],                                      # 0:  0000 - empty
+	[[EDGE_LEFT, EDGE_BOTTOM]],              # 1:  0001 - BL only
+	[[EDGE_BOTTOM, EDGE_RIGHT]],             # 2:  0010 - BR only
+	[[EDGE_LEFT, EDGE_RIGHT]],               # 3:  0011 - BL+BR
+	[[EDGE_RIGHT, EDGE_TOP]],                # 4:  0100 - TR only
+	[[EDGE_LEFT, EDGE_TOP], [EDGE_BOTTOM, EDGE_RIGHT]],  # 5:  0101 - TR+BL (saddle)
+	[[EDGE_BOTTOM, EDGE_TOP]],               # 6:  0110 - TR+BR
+	[[EDGE_LEFT, EDGE_TOP]],                 # 7:  0111 - TR+BR+BL
+	[[EDGE_TOP, EDGE_LEFT]],                 # 8:  1000 - TL only
+	[[EDGE_TOP, EDGE_BOTTOM]],               # 9:  1001 - TL+BL
+	[[EDGE_TOP, EDGE_RIGHT], [EDGE_LEFT, EDGE_BOTTOM]],  # 10: 1010 - TL+BR (saddle)
+	[[EDGE_TOP, EDGE_RIGHT]],                # 11: 1011 - TL+BR+BL
+	[[EDGE_RIGHT, EDGE_LEFT]],               # 12: 1100 - TL+TR
+	[[EDGE_RIGHT, EDGE_BOTTOM]],             # 13: 1101 - TL+TR+BL
+	[[EDGE_BOTTOM, EDGE_LEFT]],              # 14: 1110 - TL+TR+BR
+	[],                                      # 15: 1111 - full
 ]
 
 
 func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
+	if image == null:
+		return []
+
+	var width := image.get_width()
+	var height := image.get_height()
+
+	if width == 0 or height == 0:
+		return []
+
+	# Create bitmap from image
+	var bitmap := _create_bitmap(image)
+
+	# Phase 1: Generate all segments
+	var segments := _generate_segments(bitmap, width, height)
+
+	if segments.is_empty():
+		return []
+
+	# Phase 2: Chain segments into contours
+	var contours := _chain_segments(segments)
+
+	# Sort by size (largest first)
+	contours.sort_custom(func(a, b): return a.size() > b.size())
+
+	return contours
+
+
+## Create BitMap from image, handling compression
+func _create_bitmap(image: Image) -> BitMap:
 	var converted := image.duplicate()
+
 	if converted.is_compressed():
 		converted.decompress()
+
 	converted.convert(Image.FORMAT_LA8)
 
 	var bitmap := BitMap.new()
 	bitmap.create_from_image_alpha(converted, alpha_threshold)
 
-	var size := bitmap.get_size()
-	if size.x < 2 or size.y < 2:
-		return []
-
-	# Step 1: Generate all edge segments
-	var segments := _generate_segments(bitmap, size)
-	if segments.is_empty():
-		return []
-
-	# Step 2: Chain segments into closed contours
-	var contours := _chain_segments(segments)
-
-	return contours
+	return bitmap
 
 
-## Generate edge segments for all cells
-func _generate_segments(bitmap: BitMap, size: Vector2i) -> Array:
+## Generate all line segments from the bitmap
+func _generate_segments(bitmap: BitMap, width: int, height: int) -> Array:
 	var segments := []
 
-	# Cells are between pixels, so we iterate to size-1
-	for cy in range(size.y - 1):
-		for cx in range(size.x - 1):
-			var config := _get_config(bitmap, cx, cy)
+	# Iterate through all cells
+	# Cell (x, y) has corners at pixels (x,y), (x+1,y), (x+1,y+1), (x,y+1)
+	for cy in range(height):
+		for cx in range(width):
+			var case_index := _get_case(bitmap, cx, cy, width, height)
 
-			# Skip empty and full cells
-			if config == 0 or config == 15:
+			if case_index == 0 or case_index == 15:
 				continue
 
-			# Get edge pairs for this configuration
-			var edge_pairs: Array = EDGE_TABLE[config]
+			var cell_segments: Array = SEGMENT_TABLE[case_index]
 
-			for pair in edge_pairs:
-				var p1 := _edge_to_point(cx, cy, pair[0])
-				var p2 := _edge_to_point(cx, cy, pair[1])
+			for seg in cell_segments:
+				var p1 := _edge_to_point(cx, cy, seg[0])
+				var p2 := _edge_to_point(cx, cy, seg[1])
 				segments.append([p1, p2])
 
 	return segments
 
 
-## Get the 4-bit configuration for a cell
-## Cell (cx, cy) has corners at pixels:
-##   top-left: (cx, cy), top-right: (cx+1, cy)
-##   bottom-left: (cx, cy+1), bottom-right: (cx+1, cy+1)
-func _get_config(bitmap: BitMap, cx: int, cy: int) -> int:
-	var config := 0
-	if bitmap.get_bit(cx, cy):         # top-left
-		config |= 1
-	if bitmap.get_bit(cx + 1, cy):     # top-right
-		config |= 2
-	if bitmap.get_bit(cx + 1, cy + 1): # bottom-right
-		config |= 4
-	if bitmap.get_bit(cx, cy + 1):     # bottom-left
-		config |= 8
-	return config
+## Get the 4-bit case index for a cell
+## Bit order: bit3=TL, bit2=TR, bit1=BR, bit0=BL
+func _get_case(bitmap: BitMap, cx: int, cy: int, width: int, height: int) -> int:
+	var tl := _get_pixel(bitmap, cx, cy, width, height)
+	var tr := _get_pixel(bitmap, cx + 1, cy, width, height)
+	var br := _get_pixel(bitmap, cx + 1, cy + 1, width, height)
+	var bl := _get_pixel(bitmap, cx, cy + 1, width, height)
+
+	var case_index := 0
+	if tl: case_index |= 8
+	if tr: case_index |= 4
+	if br: case_index |= 2
+	if bl: case_index |= 1
+
+	return case_index
 
 
-## Convert edge index to point coordinate (midpoint of cell edge)
+## Get pixel value (false if out of bounds)
+func _get_pixel(bitmap: BitMap, x: int, y: int, width: int, height: int) -> bool:
+	if x < 0 or x >= width or y < 0 or y >= height:
+		return false
+	return bitmap.get_bit(x, y)
+
+
+## Convert edge to point coordinate (midpoint of edge)
 func _edge_to_point(cx: int, cy: int, edge: int) -> Vector2:
 	match edge:
 		EDGE_TOP:
 			return Vector2(cx + 0.5, cy)
 		EDGE_RIGHT:
-			return Vector2(cx + 1, cy + 0.5)
+			return Vector2(cx + 1.0, cy + 0.5)
 		EDGE_BOTTOM:
-			return Vector2(cx + 0.5, cy + 1)
+			return Vector2(cx + 0.5, cy + 1.0)
 		EDGE_LEFT:
 			return Vector2(cx, cy + 0.5)
-	return Vector2(cx + 0.5, cy + 0.5)
+	return Vector2(cx, cy)
 
 
 ## Chain segments into closed contours
 func _chain_segments(segments: Array) -> Array[PackedVector2Array]:
-	var contours: Array[PackedVector2Array] = []
-
 	if segments.is_empty():
-		return contours
+		return []
 
-	# Build adjacency map: point_key -> list of {segment_idx, is_start}
+	# Build adjacency map: point_key -> [connected point keys]
+	# Using keys throughout for consistent comparison
 	var adjacency := {}
 
-	for i in range(segments.size()):
-		var seg = segments[i]
-		var key0 := _point_key(seg[0])
-		var key1 := _point_key(seg[1])
+	for seg in segments:
+		var p1: Vector2 = seg[0]
+		var p2: Vector2 = seg[1]
 
-		if not adjacency.has(key0):
-			adjacency[key0] = []
-		adjacency[key0].append({"idx": i, "start": true})
+		var k1 := _point_key(p1)
+		var k2 := _point_key(p2)
 
-		if not adjacency.has(key1):
-			adjacency[key1] = []
-		adjacency[key1].append({"idx": i, "start": false})
+		if not adjacency.has(k1):
+			adjacency[k1] = []
+		if not adjacency.has(k2):
+			adjacency[k2] = []
 
-	var used := {}
+		adjacency[k1].append(k2)
+		adjacency[k2].append(k1)
 
-	# Build contours by chaining segments
-	for start_idx in range(segments.size()):
-		if used.has(start_idx):
-			continue
+	var contours: Array[PackedVector2Array] = []
+
+	# Extract contours by following adjacency chains
+	while not adjacency.is_empty():
+		# Start from any point that still has connections
+		var start_key: String = adjacency.keys()[0]
+		var start_point := _key_to_point(start_key)
 
 		var contour := PackedVector2Array()
-		var seg = segments[start_idx]
+		contour.append(start_point)
 
-		contour.append(seg[0])
-		contour.append(seg[1])
-		used[start_idx] = true
+		var prev_key: String = ""
+		var current_key: String = start_key
 
-		var current_point: Vector2 = seg[1]
-		var start_point: Vector2 = seg[0]
+		# Follow the chain until we return to start or run out of connections
+		# Limit iterations to total number of segments (each segment visited once)
+		var max_iter := segments.size() + 1
 
-		# Follow chain until we close or get stuck
-		for _iter in range(segments.size()):
-			if _points_equal(current_point, start_point):
+		for iter in range(max_iter):
+			if not adjacency.has(current_key):
 				break
 
-			var key := _point_key(current_point)
-			var found := false
+			var neighbors: Array = adjacency[current_key]
 
-			if adjacency.has(key):
-				for entry in adjacency[key]:
-					if used.has(entry["idx"]):
-						continue
+			if neighbors.is_empty():
+				adjacency.erase(current_key)
+				break
 
-					var next_seg = segments[entry["idx"]]
-					var next_point: Vector2
+			# Find next point: pick neighbor that isn't where we came from
+			var next_key: String = ""
+			var next_idx := -1
 
-					if entry["start"]:
-						next_point = next_seg[1]
-					else:
-						next_point = next_seg[0]
-
-					contour.append(next_point)
-					current_point = next_point
-					used[entry["idx"]] = true
-					found = true
+			for i in range(neighbors.size()):
+				if neighbors[i] != prev_key:
+					next_key = neighbors[i]
+					next_idx = i
 					break
 
-			if not found:
+			# If all neighbors are prev (shouldn't happen), just take first
+			if next_key == "":
+				next_key = neighbors[0]
+				next_idx = 0
+
+			# Remove this connection (both directions)
+			neighbors.remove_at(next_idx)
+			if neighbors.is_empty():
+				adjacency.erase(current_key)
+
+			# Remove reverse connection
+			if adjacency.has(next_key):
+				var reverse: Array = adjacency[next_key]
+				var rev_idx := reverse.find(current_key)
+				if rev_idx >= 0:
+					reverse.remove_at(rev_idx)
+				if reverse.is_empty():
+					adjacency.erase(next_key)
+
+			# Check if we've closed the loop
+			if next_key == start_key:
 				break
 
-		# Clean up: remove duplicate closing point
-		if contour.size() > 2 and _points_equal(contour[contour.size() - 1], contour[0]):
-			contour.remove_at(contour.size() - 1)
+			# Add next point to contour and continue
+			contour.append(_key_to_point(next_key))
+			prev_key = current_key
+			current_key = next_key
 
 		if contour.size() >= 3:
 			contours.append(contour)
@@ -208,13 +243,15 @@ func _chain_segments(segments: Array) -> Array[PackedVector2Array]:
 	return contours
 
 
-## Hash a point to an integer key
-func _point_key(p: Vector2) -> int:
-	var x := int(p.x * 2)
-	var y := int(p.y * 2)
-	return x * 100000 + y
+## Create a string key from a point (for dictionary lookups)
+func _point_key(p: Vector2) -> String:
+	# Multiply by 100 to preserve 2 decimal places of precision while avoiding
+	# floating point comparison issues. This handles sub-pixel edge positions
+	# from marching squares (e.g., 0.5, 1.5, etc.) reliably.
+	return "%d,%d" % [int(p.x * 100), int(p.y * 100)]
 
 
-## Check point equality with tolerance
-func _points_equal(a: Vector2, b: Vector2) -> bool:
-	return a.distance_squared_to(b) < 0.001
+## Convert key back to point
+func _key_to_point(key: String) -> Vector2:
+	var parts := key.split(",")
+	return Vector2(int(parts[0]) / 100.0, int(parts[1]) / 100.0)

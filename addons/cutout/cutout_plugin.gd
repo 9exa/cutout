@@ -15,12 +15,16 @@ func _enter_tree() -> void:
 
 	# Create and add the editor dock
 	dock_instance = CutoutDock.instantiate()
+
+	# Pass the editor interface to the dock so it can use the editor's 3D environment
+	if dock_instance.has_method("set_editor_interface"):
+		dock_instance.set_editor_interface(get_editor_interface())
+
 	add_control_to_bottom_panel(dock_instance, "Cutout")
 
 
 func _exit_tree() -> void:
 	# Clean up the custom node types when plugin is disabled
-	remove_custom_type("CardboardCutout")
 	remove_custom_type("CutoutMeshInstance3D")
 
 	# Remove the editor dock

@@ -211,7 +211,11 @@ static func clean_polygon(points: PackedVector2Array) -> PackedVector2Array:
 		return points
 
 	var cleaned := PackedVector2Array()
-	var epsilon := 1.0  # Tolerance for duplicate detection (increased for larger cap)
+	# Tolerance for duplicate vertex detection in pixel coordinates
+	# 1.0 pixel is sufficient to merge vertices that are effectively identical
+	# while preserving intentional sub-pixel variations from algorithms
+	const VERTEX_MERGE_EPSILON := 1.0
+	var epsilon := VERTEX_MERGE_EPSILON
 
 	for i in range(points.size()):
 		var p := points[i]
@@ -372,6 +376,8 @@ static func bisect_polygon_simple(
 	if polygon.size() < 3:
 		return [PackedVector2Array(), PackedVector2Array()]
 
+	# Small epsilon for floating point comparison when classifying vertices
+	# relative to the bisection line
 	const EPSILON := 0.0001
 
 	# Calculate line normal (points to "left" side)
@@ -458,7 +464,9 @@ static func bisect_polygon_robust(
 		return {"left": [], "right": []}
 
 	# Create two large half-plane rectangles for clipping
-	var far_distance := 100000.0
+	# This distance should exceed any reasonable polygon bounds in pixel coordinates
+	const FAR_PLANE_DISTANCE := 100000.0
+	var far_distance := FAR_PLANE_DISTANCE
 	var line_vec := (line_end - line_start).normalized()
 	var perpendicular := Vector2(-line_vec.y, line_vec.x)
 
@@ -622,6 +630,8 @@ static func _is_ear(vertex_idx: int, vertices: Array, points: PackedVector2Array
 	return true
 
 # Check if a point is inside a triangle using barycentric coordinates.
+# Uses the standard barycentric coordinate method which is numerically stable
+# and works correctly for all triangle orientations (CW or CCW).
 static func _point_in_triangle(p: Vector2, a: Vector2, b: Vector2, c: Vector2) -> bool:
 	var v0 := c - a
 	var v1 := b - a
@@ -660,8 +670,11 @@ static func _line_intersection(
 	#       | seg_vec.y  -line_vec.y |
 	var determinant := seg_vec.y * line_vec.x - seg_vec.x * line_vec.y
 
+	# Tolerance for detecting parallel lines (when determinant approaches zero)
+	const PARALLEL_LINE_EPSILON := 0.0001
+
 	# Check if lines are parallel (determinant near zero)
-	if abs(determinant) < 0.0001:
+	if abs(determinant) < PARALLEL_LINE_EPSILON:
 		return Vector2.INF
 
 	# Solve for t using Cramer's rule

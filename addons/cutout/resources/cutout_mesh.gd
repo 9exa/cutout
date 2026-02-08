@@ -170,6 +170,11 @@ func generate_mesh() -> ArrayMesh:
 		push_warning("CutoutMesh: Polygon has less than 3 points")
 		return null
 
+	# Defensive bounds checking: Warn about extremely large polygons
+	const MAX_REASONABLE_VERTICES := 10000
+	if polygon.size() > MAX_REASONABLE_VERTICES:
+		push_warning("CutoutMesh: Polygon has %d vertices (>%d), mesh generation may be slow" % [polygon.size(), MAX_REASONABLE_VERTICES])
+
 	# Generate mesh
 	return _generate_3d_mesh(polygon, image)
 
@@ -194,9 +199,15 @@ func _generate_3d_mesh(polygon: PackedVector2Array, image: Image) -> ArrayMesh:
 
 		vertices_2d.append(Vector2(vertex_x, vertex_y))
 
-		# UV: direct mapping from pixel position to 0-1
-		uvs.append(Vector2(p.x / width, p.y / height))
+		# UV: direct mapping from pixel position to 0-1, clamped to prevent artifacts
+		var uv_x := clampf(p.x / width, 0.0, 1.0)
+		var uv_y := clampf(p.y / height, 0.0, 1.0)
+		uvs.append(Vector2(uv_x, uv_y))
 
+
+	# Check for self-intersections (helps debug triangulation failures)
+	if CutoutGeometryUtils.has_self_intersections(vertices_2d):
+		push_warning("[CutoutMesh] Polygon has self-intersections - this may cause triangulation issues")
 
 	# Triangulate the polygon with fallback methods
 	var triangles := CutoutGeometryUtils.triangulate_with_fallbacks(vertices_2d)
