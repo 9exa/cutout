@@ -25,47 +25,7 @@ func calculate_boundary(image: Image) -> Array[PackedVector2Array]:
 	if image == null:
 		return []
 
-	# Store original size for coordinate scaling
-	var original_size := Vector2i(image.get_width(), image.get_height())
-
-	# Determine if downscaling is needed
-	var max_dim: int = max(original_size.x, original_size.y)
-	var needs_downscale: bool = max_resolution > 0 and max_dim > max_resolution
-
-	var processing_image: Image
-	var scale_factor := Vector2.ONE
-
-	if needs_downscale:
-		# Calculate new size maintaining aspect ratio
-		var scale := float(max_resolution) / float(max_dim)
-		var new_size := Vector2i(
-			max(1, int(original_size.x * scale)),
-			max(1, int(original_size.y * scale))
-		)
-
-		# Downscale the image
-		processing_image = image.duplicate()
-		processing_image.resize(new_size.x, new_size.y, Image.INTERPOLATE_BILINEAR)
-
-		# Calculate scale factor for point conversion
-		scale_factor = Vector2(
-			float(original_size.x) / float(new_size.x),
-			float(original_size.y) / float(new_size.y)
-		)
-	else:
-		# Use original image
-		processing_image = image
-
-	# Generate contours
-	var contours := _calculate_boundary(processing_image)
-
-	# Scale contour points back to original coordinates if needed
-	if needs_downscale:
-		for contour in contours:
-			for i in range(contour.size()):
-				contour[i] = contour[i] * scale_factor
-
-	return contours
+	return _calculate_boundary(image)
 	
 
 

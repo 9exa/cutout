@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3 uid="uid://cyfm56ktrqg1u"]
+
+[ext_resource type="Script" uid="uid://c0o4bw6vjsfg8" path="res://tests/test_slice.gd" id="1_s2wli"]
+
+[sub_resource type="SegmentShape2D" id="SegmentShape2D_s2wli"]
+a = Vector2(500, -1000)
+b = Vector2(500, 2000)
+
+[node name="TestSlice" type="Node2D"]
+script = ExtResource("1_s2wli")
+polygon = PackedVector2Array(0, 0, 1000, 0, 1000, 1000, 0, 1000)
+bisection = SubResource("SegmentShape2D_s2wli")
