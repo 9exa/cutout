@@ -5,6 +5,9 @@
 
 use godot::prelude::*;
 
+/// Constant representing no resolution limit
+pub const NO_RESOLUTION_LIMIT: Vector2 = Vector2::new(-1.0, -1.0);
+
 /// Configuration settings for contour detection
 #[derive(GodotClass)]
 #[class(base=Resource)]
@@ -22,10 +25,10 @@ pub struct ContourSettings {
     #[var]
     pub alpha_threshold: f32,
 
-    /// Maximum resolution for downscaling (0 = no limit)
+    /// Maximum resolution for downscaling (NO_RESOLUTION_LIMIT = no limit)
     #[export]
     #[var]
-    pub max_resolution: i32,
+    pub max_resolution: Vector2,
 }
 
 #[godot_api]
@@ -33,18 +36,21 @@ impl IResource for ContourSettings {
     fn init(base: Base<Resource>) -> Self {
         Self {
             base,
-            algorithm: 1,           // Default to Marching Squares
-            alpha_threshold: 0.5,   // Default threshold
-            max_resolution: 0,      // No downscaling by default
+            algorithm: 1,                        // Default to Marching Squares
+            alpha_threshold: 0.5,                // Default threshold
+            max_resolution: NO_RESOLUTION_LIMIT, // No downscaling by default
         }
     }
 }
 
 #[godot_api]
 impl ContourSettings {
+    /// Constant for no resolution limit - exposed to GDScript
+    const NO_RESOLUTION_LIMIT: Vector2 = Vector2::new(-1.0, -1.0);
+
     /// Create a new ContourSettings with custom values
     #[func]
-    pub fn create(algorithm: i32, alpha_threshold: f32, max_resolution: i32) -> Gd<Self> {
+    pub fn create(algorithm: i32, alpha_threshold: f32, max_resolution: Vector2) -> Gd<Self> {
         Gd::from_init_fn(|base| Self {
             base,
             algorithm,

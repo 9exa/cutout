@@ -4,6 +4,7 @@
 //! - Marching Squares (pixel-perfect contours with sub-pixel accuracy)
 //! - Moore Neighbor (pixel-based boundary tracing)
 
+pub mod algorithm;
 pub mod grid;
 pub mod marching_squares;
 pub mod moore_neighbour;

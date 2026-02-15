@@ -34,7 +34,7 @@ impl ContourProcessor {
     /// * `images` - Array of images to process
     /// * `algorithm` - Algorithm to use (0 = Moore, 1 = Marching Squares)
     /// * `alpha_threshold` - Alpha threshold for solid pixels
-    /// * `max_resolution` - Maximum resolution (0 = no limit)
+    /// * `max_resolution` - Maximum resolution (NO_RESOLUTION_LIMIT = no limit)
     ///
     /// # Returns
     /// Array of contour arrays (one per image)
@@ -44,7 +44,7 @@ impl ContourProcessor {
         images: Array<Gd<Image>>,
         algorithm: i32,
         alpha_threshold: f32,
-        max_resolution: i32,
+        max_resolution: Vector2,
     ) -> Array<Variant> {
         let mut results = Array::new();
 
@@ -145,8 +145,8 @@ impl ContourProcessor {
                     .unwrap_or(0.5);
                 let max_resolution = dict
                     .get("max_resolution")
-                    .map(|v| v.try_to::<i32>().unwrap_or(0))
-                    .unwrap_or(0);
+                    .map(|v| v.try_to::<Vector2>().unwrap_or(super::settings::NO_RESOLUTION_LIMIT))
+                    .unwrap_or(super::settings::NO_RESOLUTION_LIMIT);
 
                 let contours = self.process_single_image(
                     &image,
@@ -172,19 +172,30 @@ impl ContourProcessor {
         image: &Gd<Image>,
         algorithm: i32,
         alpha_threshold: f32,
-        max_resolution: i32,
+        max_resolution: Vector2,
     ) -> Vec<Vec<Vector2>> {
         let width = image.get_width();
         let height = image.get_height();
-        let max_dim = width.max(height);
 
-        // Check if downscaling is needed
-        let needs_downscaling = max_resolution > 0 && max_dim > max_resolution;
-        let scale_factor = if needs_downscaling {
-            max_resolution as f32 / max_dim as f32
+        // Check if downscaling is needed (max_resolution components < 0 means no limit)
+        let needs_x_downscale = max_resolution.x > 0.0 && width as f32 > max_resolution.x;
+        let needs_y_downscale = max_resolution.y > 0.0 && height as f32 > max_resolution.y;
+        let needs_downscaling = needs_x_downscale || needs_y_downscale;
+
+        // Calculate scale factors for each dimension independently
+        let scale_x = if needs_x_downscale {
+            max_resolution.x / width as f32
         } else {
             1.0
         };
+        let scale_y = if needs_y_downscale {
+            max_resolution.y / height as f32
+        } else {
+            1.0
+        };
+
+        // Use the smaller scale factor to ensure both dimensions stay within limits
+        let scale_factor = scale_x.min(scale_y);
 
         // Downscale image if needed
         let working_image = if needs_downscaling {

@@ -8,66 +8,48 @@
 //! 3. Tracing the boundary clockwise using Moore neighborhood (8 directions)
 //! 4. Stopping when returning to the starting pixel
 
-use godot::prelude::*;
-use godot::classes::Image;
+use super::algorithm::ContourAlgorithm;
 use super::grid::Grid;
+use godot::classes::Image;
+use godot::prelude::*;
 
-/// Pure Rust function for Moore Neighbour contour detection
-///
-/// # Arguments
-/// * `grid` - Binary grid of solid/empty pixels
-///
-/// # Returns
-/// Vector of contours, each contour is a vector of points
-pub fn calculate(_grid: &Grid) -> Vec<Vec<Vector2>> {
-    // TODO: Implement Moore Neighbour algorithm
-    // For now, return empty vector (stub implementation)
-    Vec::new()
-}
+const NEIGHBOR_DIRECTIONS: [Vector2i; 8] = [
+    Vector2i::new(-1, 0),  // W
+    Vector2i::new(-1, -1), // NW
+    Vector2i::new(0, -1),  // N
+    Vector2i::new(1, -1),  // NE
+    Vector2i::new(1, 0),   // E
+    Vector2i::new(1, 1),   // SE
+    Vector2i::new(0, 1),   // S
+    Vector2i::new(-1, 1),  // SW
+];
 
-#[derive(GodotClass)]
-#[class(base=RefCounted)]
-pub struct MooreNeighbourNative {
-    #[base]
-    base: Base<RefCounted>,
+pub struct MooreNeighboour;
 
-    #[var]
-    pub alpha_threshold: f32,
-}
-
-#[godot_api]
-impl IRefCounted for MooreNeighbourNative {
-    fn init(base: Base<RefCounted>) -> Self {
-        Self {
-            base,
-            alpha_threshold: 0.5,
-        }
+impl ContourAlgorithm for MooreNeighboour {
+    fn calculate_boundary(
+        image: &Image,
+        alpha_threshold: f32,
+        _max_resolution: Vector2,
+    ) -> Vec<Vec<Vector2>> {
+        let bitmap = Grid::from_image(image, alpha_threshold);
+        let visited = Grid::new(bitmap.width(), bitmap.height());
     }
 }
 
-#[godot_api]
-impl MooreNeighbourNative {
-    /// Calculate boundary contours from an image using Moore Neighbor tracing
-    #[func]
-    pub fn calculate_boundary(&self, image: Gd<Image>) -> Array<PackedVector2Array> {
-        // TODO: Implement Moore Neighbor algorithm
-        //
-        // Steps:
-        // 1. Convert image to BitMap based on alpha_threshold
-        // 2. Find starting pixel (topmost-leftmost solid pixel)
-        // 3. Initialize boundary array and visited tracking
-        // 4. Start tracing:
-        //    - Check 8 neighbors in clockwise order (Moore neighborhood)
-        //    - Move to next solid pixel that hasn't been visited
-        //    - Add current pixel to boundary
-        //    - Stop when back at starting pixel
-        // 5. Return array containing the single contour
-        //
-        // Reference: See GDScript implementation for DIRECTIONS constant
-
-        Array::new()
-    }
-}
+// TODO: Implement Moore Neighbor algorithm
+//
+// Steps:
+// 1. Convert image to BitMap based on alpha_threshold
+// 3. Initialize boundary array and visited tracking
+// 4. Start tracing:
+//    - Check 8 neighbors in clockwise order (Moore neighborhood)
+//    - Move to next solid pixel that hasn't been visited
+//    - Add current pixel to boundary
+//    - Stop when back at starting pixel
+// 5. Return array containing the single contour
+//
+// Reference: See GDScript implementation for DIRECTIONS constant
 
 // Note: Trait implementation can be added later if needed
 // impl ContourAlgorithm for MooreNeighbourNative {

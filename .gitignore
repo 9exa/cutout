@@ -1,0 +1,55 @@
+# Godot 4+ specific ignores
+.godot/
+*.import
+
+# Godot-specific
+*.translation
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# System/tool-specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# IDE-specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+export/
+builds/
+*.apk
+*.exe
+*.dmg
+*.zip
+*.pck
+
+# Temporary files
+*.log
+*.tmp
+*.bak
+*.orig
+
+# Development files (keep in repo but exclude from plugin export)
+demo_project/
+docs/
+
+# Asset Library export directory
+asset_library_export/
+
+# Rust build artifacts
+**/target/
+**/*.rs.bk
+**/Cargo.lock
