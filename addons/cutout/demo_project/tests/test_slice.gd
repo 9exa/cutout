@@ -9,7 +9,7 @@ func _ready():
 	var polygons: Array[PackedVector2Array]
 	polygons.append(polygon)
 
-	var result := CutoutGeometryUtils.bisect_polygon(
+	var result = CutoutGeometryUtils.bisect_polygon(
 		polygons,
 		bisection.a,
 		bisection.b

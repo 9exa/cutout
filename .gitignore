@@ -42,9 +42,8 @@ builds/
 *.bak
 *.orig
 
-# Development files (keep in repo but exclude from plugin export)
-demo_project/
-docs/
+# Temporary Windows files
+~*.dll
 
 # Asset Library export directory
 asset_library_export/

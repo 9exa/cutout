@@ -608,7 +608,6 @@ func _run_pipeline():
 		polygon = contour_polygon
 	else:
 		polygon = contour_polygon
-	print("polygon after contour", polygon)
 
 	# Stage 2: Pre-simplification (mandatory)
 	if dirty_stages["pre_simp"]:

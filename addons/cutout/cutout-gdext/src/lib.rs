@@ -6,8 +6,11 @@ pub mod contour;
 pub mod fracture;
 pub mod simplify;
 
-// Import classes to ensure they're registered
+// Import classes to ensure they're registered with Godot
+#[allow(unused_imports)]
 use contour::CutoutContourProcessor;
+#[allow(unused_imports)]
+use fracture::CutoutDestructionProcessor;
 
 struct CutoutExtension;
 

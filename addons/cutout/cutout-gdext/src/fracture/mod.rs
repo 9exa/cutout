@@ -1,19 +1,15 @@
 //! Polygon fracturing/destruction algorithms
 //!
-//! This module provides implementations of:
+//! This module provides:
+//! - `CutoutDestructionProcessor` - Stateless Godot API for fracture operations
 //! - Voronoi fracturing - Break polygons into irregular pieces using Voronoi diagrams
 //! - Slice fracturing - Cut polygons along lines
+//! - Seed generation - 5 distribution patterns for Voronoi cell placement
 
+pub mod geometry;
+pub mod processor;
+pub mod seeds;
 pub mod slice;
 pub mod voronoi;
 
-use godot::prelude::*;
-
-/// Common trait for all destruction/fracturing algorithms
-pub trait DestructionAlgorithm {
-    /// Fracture polygons into multiple fragments
-    ///
-    /// Takes an array of polygons (first = outer boundary, rest = holes)
-    /// Returns an array of fragment polygons.
-    fn fracture(&self, polygons: Array<PackedVector2Array>) -> Array<PackedVector2Array>;
-}
+pub use processor::CutoutDestructionProcessor;
