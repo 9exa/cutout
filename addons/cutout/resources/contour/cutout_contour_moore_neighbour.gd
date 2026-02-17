@@ -27,12 +27,15 @@ const DIRECTIONS = [
 
 ## Virtual. Concrete implementation of calculate_boundary
 func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
+	# Convert max_resolution int to Vector2 (0 = no limit = Vector2(-1, -1))
+	var max_res_vec := Vector2(-1, -1) if max_resolution == 0 else Vector2(max_resolution, max_resolution)
+
 	# Call Rust batch processor with single image
-	var results = ContourProcessor.calculate_batch_uniform(
+	var results = CutoutContourProcessor.calculate_batch_uniform(
 		[image],           # Single image as batch of 1
 		ALGORITHM_TYPE,    # Enum value
 		alpha_threshold,   # From base class
-		max_resolution     # From base class
+		max_res_vec        # From base class (converted to Vector2)
 	)
 
 	# Extract first (and only) result

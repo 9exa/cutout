@@ -1,3 +1,11 @@
+# Cutout GDExtension - Rust backend for contour detection, simplification, and fracture
+#
+# Build instructions:
+#   Release: .\build.ps1 release (or just .\build.ps1)
+#   Debug:   .\build.ps1 debug
+#
+# This will compile and copy the library to addons/cutout/bin/ with the correct name
+
 [package]
 name = "cutout-gdext"
 version = "0.1.0"

@@ -47,11 +47,14 @@ const SEGMENT_TABLE := [
 
 
 func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
+	# Convert max_resolution int to Vector2 (0 = no limit = Vector2(-1, -1))
+	var max_res_vec := Vector2(-1, -1) if max_resolution == 0 else Vector2(max_resolution, max_resolution)
+
 	# Call Rust batch processor with single image
-	var results = ContourProcessor.calculate_batch_uniform(
+	var results = CutoutContourProcessor.calculate_batch_uniform(
 		[image],
 		ALGORITHM_TYPE,
 		alpha_threshold,
-		max_resolution
+		max_res_vec
 	)
 	return results[0] if results.size() > 0 else []

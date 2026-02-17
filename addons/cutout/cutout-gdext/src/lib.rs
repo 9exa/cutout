@@ -6,6 +6,9 @@ pub mod contour;
 pub mod fracture;
 pub mod simplify;
 
+// Import classes to ensure they're registered
+use contour::CutoutContourProcessor;
+
 struct CutoutExtension;
 
 #[gdextension]

@@ -45,9 +45,6 @@ impl IResource for ContourSettings {
 
 #[godot_api]
 impl ContourSettings {
-    /// Constant for no resolution limit - exposed to GDScript
-    const NO_RESOLUTION_LIMIT: Vector2 = Vector2::new(-1.0, -1.0);
-
     /// Create a new ContourSettings with custom values
     #[func]
     pub fn create(algorithm: i32, alpha_threshold: f32, max_resolution: Vector2) -> Gd<Self> {

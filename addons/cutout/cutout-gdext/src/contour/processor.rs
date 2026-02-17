@@ -1,33 +1,27 @@
-//! ContourProcessor - Batch processing API for contour detection
+//! CutoutContourProcessor - Batch processing API for contour detection
 //!
 //! This module provides high-level APIs for processing multiple images with
 //! different settings, handling all downscaling/upscaling and grid conversion.
 
-use godot::prelude::*;
-use godot::classes::Image;
-use godot::builtin::VarDictionary as Dictionary;
-use super::grid::Grid;
-use super::settings::ContourSettings;
-use super::moore_neighbour;
+use super::grid::create_grid_from_image;
 use super::marching_squares;
+use super::moore_neighbour;
+use super::settings::{ContourSettings, NO_RESOLUTION_LIMIT};
+use godot::builtin::VarDictionary as Dictionary;
+use godot::classes::image::Format;
+use godot::classes::Image;
+use godot::prelude::*;
 
 /// Main processor for batch contour detection
+///
+/// This is a stateless utility class providing static methods for contour detection.
+/// All methods can be called directly without instantiation.
 #[derive(GodotClass)]
-#[class(base=RefCounted)]
-pub struct ContourProcessor {
-    #[base]
-    base: Base<RefCounted>,
-}
+#[class(no_init)]
+pub struct CutoutContourProcessor;
 
 #[godot_api]
-impl IRefCounted for ContourProcessor {
-    fn init(base: Base<RefCounted>) -> Self {
-        Self { base }
-    }
-}
-
-#[godot_api]
-impl ContourProcessor {
+impl CutoutContourProcessor {
     /// Process multiple images with uniform settings
     ///
     /// # Arguments
@@ -40,7 +34,6 @@ impl ContourProcessor {
     /// Array of contour arrays (one per image)
     #[func]
     pub fn calculate_batch_uniform(
-        &self,
         images: Array<Gd<Image>>,
         algorithm: i32,
         alpha_threshold: f32,
@@ -49,12 +42,7 @@ impl ContourProcessor {
         let mut results = Array::new();
 
         for image in images.iter_shared() {
-            let contours = self.process_single_image(
-                &image,
-                algorithm,
-                alpha_threshold,
-                max_resolution,
-            );
+            let contours = Self::process_single_image(&image, algorithm, alpha_threshold, max_resolution);
             let contour_array = Self::to_godot_array(contours);
             results.push(&contour_array.to_variant());
         }
@@ -72,7 +60,6 @@ impl ContourProcessor {
     /// Array of contour arrays (one per image)
     #[func]
     pub fn calculate_batch(
-        &self,
         images: Array<Gd<Image>>,
         settings: Array<Gd<ContourSettings>>,
     ) -> Array<Variant> {
@@ -91,7 +78,7 @@ impl ContourProcessor {
             if let (Some(image), Some(setting)) = (images.get(i), settings.get(i)) {
                 let setting_bind = setting.bind();
 
-                let contours = self.process_single_image(
+                let contours = Self::process_single_image(
                     &image,
                     setting_bind.algorithm,
                     setting_bind.alpha_threshold,
@@ -115,7 +102,6 @@ impl ContourProcessor {
     /// Array of contour arrays (one per image)
     #[func]
     pub fn calculate_batch_dict(
-        &self,
         images: Array<Gd<Image>>,
         settings: Array<Variant>,
     ) -> Array<Variant> {
@@ -132,7 +118,9 @@ impl ContourProcessor {
 
         for i in 0..images.len() {
             if let (Some(image), Some(dict_variant)) = (images.get(i), settings.get(i)) {
-                let dict = dict_variant.try_to::<Dictionary>().unwrap_or_else(|_| Dictionary::new());
+                let dict = dict_variant
+                    .try_to::<Dictionary>()
+                    .unwrap_or_else(|_| Dictionary::new());
 
                 // Extract settings from dictionary with defaults
                 let algorithm = dict
@@ -145,15 +133,11 @@ impl ContourProcessor {
                     .unwrap_or(0.5);
                 let max_resolution = dict
                     .get("max_resolution")
-                    .map(|v| v.try_to::<Vector2>().unwrap_or(super::settings::NO_RESOLUTION_LIMIT))
-                    .unwrap_or(super::settings::NO_RESOLUTION_LIMIT);
+                    .map(|v| v.try_to::<Vector2>().unwrap_or(NO_RESOLUTION_LIMIT))
+                    .unwrap_or(NO_RESOLUTION_LIMIT);
 
-                let contours = self.process_single_image(
-                    &image,
-                    algorithm,
-                    alpha_threshold,
-                    max_resolution,
-                );
+                let contours =
+                    Self::process_single_image(&image, algorithm, alpha_threshold, max_resolution);
                 let contour_array = Self::to_godot_array(contours);
                 results.push(&contour_array.to_variant());
             }
@@ -163,12 +147,11 @@ impl ContourProcessor {
     }
 }
 
-impl ContourProcessor {
+impl CutoutContourProcessor {
     /// Process a single image with given settings
     ///
     /// Handles downscaling, grid conversion, algorithm dispatch, and upscaling
     fn process_single_image(
-        &self,
         image: &Gd<Image>,
         algorithm: i32,
         alpha_threshold: f32,
@@ -197,27 +180,32 @@ impl ContourProcessor {
         // Use the smaller scale factor to ensure both dimensions stay within limits
         let scale_factor = scale_x.min(scale_y);
 
-        // Downscale image if needed
-        let working_image = if needs_downscaling {
+        // Deep-copy the image so we never mutate the caller's original.
+        // `Gd::clone()` only increments the ref-count for RefCounted types,
+        // so we must use `duplicate_resource()` to get an independent copy.
+        let mut working_image = image.duplicate_resource();
+
+        if needs_downscaling {
             let new_width = (width as f32 * scale_factor) as i32;
             let new_height = (height as f32 * scale_factor) as i32;
+            working_image.resize(new_width, new_height);
+        }
 
-            let mut resized = image.clone();
-            resized.resize(new_width, new_height);
-            resized
-        } else {
-            image.clone()
-        };
+        working_image.decompress();
+        working_image.convert(Format::RGBA8);
 
-        // Create grid from (possibly downscaled) image
-        let grid = Grid::from_image(&working_image, alpha_threshold);
+        // Create grid from prepared image (single get_data() FFI call internally)
+        let grid = create_grid_from_image(&working_image, alpha_threshold);
 
         // Dispatch to appropriate algorithm
         let mut contours = match algorithm {
             0 => moore_neighbour::calculate(&grid),
             1 => marching_squares::calculate(&grid),
             _ => {
-                godot_error!("Unknown algorithm: {}, defaulting to Marching Squares", algorithm);
+                godot_error!(
+                    "Unknown algorithm: {}, defaulting to Marching Squares",
+                    algorithm
+                );
                 marching_squares::calculate(&grid)
             }
         };
@@ -237,7 +225,7 @@ impl ContourProcessor {
     }
 
     /// Convert Vec<Vec<Vector2>> to Godot Array<Variant>
-    fn to_godot_array(contours: Vec<Vec<Vector2>>) -> Array<Variant> {
+    fn to_godot_array(contours: Vec<Vec<Vector2>>) -> Array<PackedVector2Array> {
         let mut result = Array::new();
 
         for contour in contours {
@@ -245,7 +233,7 @@ impl ContourProcessor {
             for point in contour {
                 packed.push(point);
             }
-            result.push(&packed.to_variant());
+            result.push(&packed);
         }
 
         result
