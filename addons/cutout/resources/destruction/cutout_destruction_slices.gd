@@ -269,7 +269,79 @@ func _set(property: StringName, value) -> bool:
 
 
 ## Implementation of multi-slice fracture algorithm.
+## Delegates the entire pipeline (segment generation + slicing + holes) to Rust.
 func _fracture(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
+	if mode == SliceMode.PATTERN:
+		# Call pattern-specific Rust functions to avoid parameter limit
+		match _pattern:
+			Pattern.RADIAL:
+				return CutoutDestructionProcessor.fracture_slices_radial(
+					polygons,
+					seed,
+					_slice_count,
+					_origin,
+					_radial_randomness
+				)
+			Pattern.PARALLEL:
+				# Special case for parallel with low randomness
+				if _parallel_angle_rand < PARALLEL_PATTERN_OPTIMIZED_ANGLE_RAND_THRESH:
+					return CutoutDestructionProcessor.fracture_slices_parallel_optimized(
+						polygons,
+						seed,
+						_slice_count,
+						_parallel_angle,
+						_parallel_angle_rand
+					)
+				return CutoutDestructionProcessor.fracture_slices_parallel(
+					polygons,
+					seed,
+					_slice_count,
+					_parallel_angle,
+					_parallel_angle_rand
+				)
+			Pattern.GRID:
+				return CutoutDestructionProcessor.fracture_slices_grid(
+					polygons,
+					seed,
+					_h_start,
+					_v_start,
+					_h_slices,
+					_v_slices,
+					_h_random,
+					_v_random,
+					_h_angle_rand,
+					_v_angle_rand
+				)
+			Pattern.CHAOTIC:
+				return CutoutDestructionProcessor.fracture_slices_chaotic(
+					polygons,
+					seed,
+					_slice_count
+				)
+			_:
+				push_warning("CutoutDestructionSlices: Unknown pattern type")
+				return polygons
+	else:  # MANUAL mode
+		if _manual_slices.is_empty():
+			push_warning("CutoutDestructionSlices: No manual slices defined")
+			return polygons
+
+		# Encode manual segments for Rust
+		var encoded_segments: Array[PackedVector2Array] = []
+		for segment in _manual_slices:
+			if segment:
+				encoded_segments.append(PackedVector2Array([segment.a, segment.b]))
+
+		if encoded_segments.is_empty():
+			push_warning("CutoutDestructionSlices: No valid manual slices")
+			return polygons
+
+		return CutoutDestructionProcessor.fracture_slices_manual(polygons, encoded_segments)
+
+
+## GDScript reference implementation (kept for fallback/debugging).
+## Call this instead of _fracture() if you need the pure-GDScript path.
+func _fracture_gdscript(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 
@@ -286,7 +358,7 @@ func _fracture(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]
 		print("_pattern: ", _pattern)
 		if _pattern == Pattern.PARALLEL and _parallel_angle_rand < PARALLEL_PATTERN_OPTIMIZED_ANGLE_RAND_THRESH:
 			# Use optimized path for parallel slices with low randomness
-			return _fracture_parallel_optimized(polygons, rng)
+			return _fracture_parallel_optimized_gdscript(polygons, rng)
 		slice_segments = _generate_random_slices(outer_polygon, rng)
 	else:  # MANUAL mode
 		slice_segments = _manual_slices.duplicate()
@@ -553,9 +625,14 @@ func _generate_random_slices(polygon: PackedVector2Array, rng: RandomNumberGener
 # 	return output_polygons
 
 
-# Optimized generation of parallel slices with low randomness
-func _fracture_parallel_optimized(polygons: Array[PackedVector2Array], rng: RandomNumberGenerator) -> Array[PackedVector2Array]:
-	print("Using optimized parallel low-random-angle fracture")
+# The parallel optimized path is now handled directly in _fracture()
+# by calling CutoutDestructionProcessor.fracture_slices_parallel_optimized()
+
+
+# GDScript reference implementation of the optimized parallel fracture path.
+# Kept for fallback/debugging; uses CutoutGeometryUtils.bisect_polygon directly.
+func _fracture_parallel_optimized_gdscript(polygons: Array[PackedVector2Array], rng: RandomNumberGenerator) -> Array[PackedVector2Array]:
+	print("Using optimized parallel low-random-angle fracture (GDScript)")
 
 	# Extract outer polygon and holes
 	var outer_polygon := polygons[0]
@@ -582,11 +659,9 @@ func _fracture_parallel_optimized(polygons: Array[PackedVector2Array], rng: Rand
 	var output_polygons: Array[PackedVector2Array] = []
 
 	# Store min/max projections for each polygon
-	# We use conservative bounds by considering the angle variation
 	var min_projs: Array[float] = []
 	var max_projs: Array[float] = []
 
-	# Initialize with conservative projections for the outer polygon only
 	var conservative_bounds := _calculate_conservative_projection_bounds(
 		outer_polygon, base_perp, max_angle_deviation
 	)
@@ -596,7 +671,6 @@ func _fracture_parallel_optimized(polygons: Array[PackedVector2Array], rng: Rand
 	var center_proj = center.dot(base_perp)
 
 	for i in range(1, _slice_count + 1):
-		# Generate slice with potential angle randomness
 		var angle := base_angle
 		if _parallel_angle_rand > 0.0:
 			angle += rng.randf_range(-max_angle_deviation, max_angle_deviation)
@@ -611,7 +685,6 @@ func _fracture_parallel_optimized(polygons: Array[PackedVector2Array], rng: Rand
 
 		var slice_proj = center_proj + (i * spacing - max_extent)
 
-		# Use a slightly expanded slice projection range to account for angle variation
 		var slice_proj_min = slice_proj - abs(sin(max_angle_deviation)) * max_extent * 0.1
 		var slice_proj_max = slice_proj + abs(sin(max_angle_deviation)) * max_extent * 0.1
 
@@ -621,17 +694,14 @@ func _fracture_parallel_optimized(polygons: Array[PackedVector2Array], rng: Rand
 
 		for j in range(remaining_polygons.size()):
 			if min_projs[j] > slice_proj_max:
-				# Polygon is entirely on one side of the slice, keep it for next round
 				new_min_projs.append(min_projs[j])
 				new_max_projs.append(max_projs[j])
 				new_remaining_polygons.append(remaining_polygons[j])
 				continue
 			elif max_projs[j] < slice_proj_min:
-				# Polygon is entirely on the other side of the slice, output it
 				output_polygons.append(remaining_polygons[j])
 				continue
 			else:
-				# Polygon might intersect the slice, bisect it
 				var to_bisect: Array[PackedVector2Array]
 				to_bisect.append(remaining_polygons[j])
 				var result := CutoutGeometryUtils.bisect_polygon(
@@ -640,7 +710,6 @@ func _fracture_parallel_optimized(polygons: Array[PackedVector2Array], rng: Rand
 					segment.b
 				)
 
-				# Process both left and right sides
 				for result_polygon in result[0]:  # Left side
 					if result_polygon.size() >= 3:
 						var result_conservative_bounds := _calculate_conservative_projection_bounds(
@@ -740,8 +809,10 @@ func _calculate_bounds(polygon: PackedVector2Array) -> Rect2:
 	return Rect2(min_x, min_y, max_x - min_x, max_y - min_y)
 
 
-## Subtract holes from fragments using Clipper library.
-## Returns array of fragments with holes removed.
+## Subtract holes from fragments using Godot's Clipper-backed Geometry2D.
+## Used only by the GDScript fallback paths (_fracture_gdscript,
+## _fracture_parallel_optimized_gdscript). The live code paths delegate
+## hole subtraction to Rust via fracture_slices / fracture_slices_parallel_optimized.
 func _subtract_holes_from_fragments(
 	fragments: Array[PackedVector2Array],
 	holes: Array[PackedVector2Array]

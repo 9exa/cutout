@@ -203,7 +203,93 @@ func _set(property: StringName, value) -> bool:
 
 
 ## Implementation of Voronoi fracture algorithm.
+## Delegates seed generation and fracture to the Rust CutoutDestructionProcessor.
 func _fracture(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
+	var outer_polygon := polygons[0]
+	var bounds := _calculate_bounds(outer_polygon)
+
+	# Generate seed points via the Rust implementation
+	var seed_points := _generate_seed_points_rust(outer_polygon, bounds)
+
+	# Store for debugging
+	_debug_seed_points = seed_points.duplicate()
+
+	if seed_points.size() < 2:
+		push_warning("CutoutDestructionVoronoi: Not enough valid seed points generated")
+		return polygons
+
+	# Delegate Voronoi fracture entirely to Rust
+	var fragments := CutoutDestructionProcessor.fracture_voronoi(polygons, seed_points)
+
+	if fragments.is_empty():
+		push_warning("CutoutDestructionVoronoi: No valid fragments generated, returning original")
+		return polygons
+
+	return fragments
+
+
+## Dispatches seed generation to the appropriate Rust generator based on pattern.
+func _generate_seed_points_rust(outer_polygon: PackedVector2Array, bounds: Rect2) -> PackedVector2Array:
+	match pattern:
+		SeedPattern.RANDOM:
+			return CutoutDestructionProcessor.generate_random_seeds(
+				outer_polygon,
+				fragment_count,
+				min_cell_distance,
+				edge_padding,
+				seed
+			)
+		SeedPattern.GRID:
+			return CutoutDestructionProcessor.generate_grid_seeds(
+				outer_polygon,
+				_grid_rows,
+				_grid_cols,
+				_grid_jitter,
+				min_cell_distance,
+				edge_padding,
+				seed
+			)
+		SeedPattern.RADIAL:
+			var origin := _origin if _origin != Vector2.ZERO else bounds.get_center()
+			return CutoutDestructionProcessor.generate_radial_seeds(
+				outer_polygon,
+				origin,
+				_ring_count,
+				_ring_size,
+				_points_per_ring,
+				_radial_variation,
+				min_cell_distance,
+				seed
+			)
+		SeedPattern.SPIDERWEB:
+			var origin := _origin if _origin != Vector2.ZERO else bounds.get_center()
+			return CutoutDestructionProcessor.generate_spiderweb_seeds(
+				outer_polygon,
+				origin,
+				_ring_count,
+				_ring_size,
+				_points_per_ring,
+				_radial_variation,
+				min_cell_distance,
+				seed
+			)
+		SeedPattern.POISSON_DISK:
+			return CutoutDestructionProcessor.generate_poisson_seeds(
+				outer_polygon,
+				fragment_count,
+				min_cell_distance,
+				edge_padding,
+				_poisson_attempts,
+				seed
+			)
+		_:
+			push_error("Unknown seed pattern: %d" % pattern)
+			return PackedVector2Array()
+
+
+## GDScript reference implementation (kept for fallback/debugging).
+## Call this instead of _fracture() if you need the pure-GDScript path.
+func _fracture_gdscript(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
 	# Initialize random number generator with seed
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
@@ -213,7 +299,6 @@ func _fracture(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]
 
 	# Calculate polygon bounds (only using outer boundary)
 	var bounds := _calculate_bounds(outer_polygon)
-	var bounds_size := bounds.size
 
 	# Generate Voronoi seed points within the outer polygon
 	var seed_points := _generate_seed_points(outer_polygon, bounds, rng)

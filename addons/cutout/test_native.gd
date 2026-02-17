@@ -5,9 +5,10 @@ extends EditorScript
 ## Run this from the Godot editor: File > Run Script
 
 func _run() -> void:
-	print("=" * 60)
+	var separator = "============================================================"
+	print(separator)
 	print("Testing Cutout Native Extension")
-	print("=" * 60)
+	print(separator)
 
 	# Check if native class exists
 	if ClassDB.class_exists("CutoutNative"):
@@ -33,4 +34,4 @@ func _run() -> void:
 		print("3. Restart Godot editor")
 		print("4. Check the Output tab for loading errors")
 
-	print("=" * 60)
+	print(separator)

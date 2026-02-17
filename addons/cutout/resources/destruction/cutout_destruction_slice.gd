@@ -30,7 +30,30 @@ extends CutoutDestructionAlgorithm
 
 
 ## Implementation of slice fracture algorithm.
+## Delegates to the Rust CutoutDestructionProcessor for performance.
 func _fracture(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
+	# Validate line
+	if line_start.distance_to(line_end) < 0.001:
+		push_warning("CutoutDestructionSlice: Line start and end are too close")
+		return polygons
+
+	# Delegate to Rust implementation
+	var fragments := CutoutDestructionProcessor.fracture_slice(
+		polygons,
+		line_start,
+		line_end
+	)
+
+	if fragments.is_empty():
+		push_warning("CutoutDestructionSlice: Line did not intersect polygon")
+		return polygons
+
+	return fragments
+
+
+## GDScript reference implementation (kept for fallback/debugging).
+## Call this instead of _fracture() if you need the pure-GDScript path.
+func _fracture_gdscript(polygons: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
 	# Validate line
 	if line_start.distance_to(line_end) < 0.001:
 		push_warning("CutoutDestructionSlice: Line start and end are too close")

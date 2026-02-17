@@ -1,13 +1,22 @@
-[gd_scene load_steps=4 format=3 uid="uid://b5arcgujyts47"]
+[gd_scene format=3 uid="uid://b5arcgujyts47"]
 
-[ext_resource type="Script" uid="uid://or26prdqpnfp" path="res://tests/destruction_visualizer.gd" id="1_destruction"]
+[ext_resource type="Script" uid="uid://or26prdqpnfp" path="res://addons/cutout/demo_project/tests/destruction_visualizer.gd" id="1_destruction"]
 [ext_resource type="Script" uid="uid://bvb31c1uw65q1" path="res://addons/cutout/resources/destruction/cutout_destruction_voronoi.gd" id="2_svqc5"]
 
 [sub_resource type="Resource" id="Resource_its6p"]
 script = ExtResource("2_svqc5")
+pattern = 3
+min_cell_distance = 0.12
+edge_padding = 10.0
+origin = Vector2(0, 0)
+ring_count = 10
+ring_size = 30.0
+points_per_ring = 3
+radial_variation = 0.0
+seed = 3
 metadata/_custom_type_script = "uid://bvb31c1uw65q1"
 
-[node name="DestructionVisualizer" type="Node2D"]
+[node name="DestructionVisualizer" type="Node2D" unique_id=338466062]
 script = ExtResource("1_destruction")
 polygon_preset = 0
 source_polygons = Array[PackedVector2Array]([PackedVector2Array(175.45451, 170.75049, 226.53302, 196.53899, 254.35281, 223.56207, 271.0633, 245.82521, 242.70409, 244.03314, 262.6026, 285.83392, 267.59973, 304.03516, 260.21918, 310.0923, 246.15984, 323.6189, 235.43817, 345.45227, 237.44531, 366.9737, 260.45706, 392.42618, 262.97723, 566.6656, 263.30634, 633.51013, 277.148, 678.611, 70.45796, 678.611, 52.578773, 650.8246, 19.979027, 632.6824, 16.041733, 548.23895, 21.38433, 475.8892, 21.1157, 360.48206, 57.2826, 341.72675, 66.20532, 327.45694, 61.976303, 317.48495, 54.150574, 301.7611, 45.004265, 289.12756, 38.64081, 278.0114, 37.35418, 268.95874, 38.770103, 260.04608, 50.03347, 243.08618, 81.08639, 210.55334, 125.92162, 175.0965)])

@@ -57,6 +57,167 @@ impl CutoutDestructionProcessor {
         slice::fracture(&polygons, line_start, line_end)
     }
 
+    /// Fracture polygons using radial slice pattern.
+    ///
+    /// Creates slices radiating from a central origin point.
+    ///
+    /// # Arguments
+    /// * `polygons` - Array of polygons (first = outer boundary, rest = holes)
+    /// * `seed` - Random seed for angle variation
+    /// * `slice_count` - Number of radial slices
+    /// * `origin` - Center point for radial slices (Vector2.ZERO = polygon center)
+    /// * `radial_randomness` - Random angle variation (0-1)
+    #[func]
+    pub fn fracture_slices_radial(
+        polygons: Array<PackedVector2Array>,
+        seed: i64,
+        slice_count: i32,
+        origin: Vector2,
+        radial_randomness: f32,
+    ) -> Array<PackedVector2Array> {
+        slice::fracture_slices_radial(
+            &polygons,
+            seed,
+            slice_count,
+            origin,
+            radial_randomness,
+        )
+    }
+
+    /// Fracture polygons using parallel slice pattern.
+    ///
+    /// Creates parallel slices at a specified angle.
+    ///
+    /// # Arguments
+    /// * `polygons` - Array of polygons (first = outer boundary, rest = holes)
+    /// * `seed` - Random seed for angle variation
+    /// * `slice_count` - Number of parallel slices
+    /// * `parallel_angle` - Base angle in degrees
+    /// * `parallel_angle_rand` - Random angle variation (0-1)
+    #[func]
+    pub fn fracture_slices_parallel(
+        polygons: Array<PackedVector2Array>,
+        seed: i64,
+        slice_count: i32,
+        parallel_angle: f32,
+        parallel_angle_rand: f32,
+    ) -> Array<PackedVector2Array> {
+        slice::fracture_slices_parallel(
+            &polygons,
+            seed,
+            slice_count,
+            parallel_angle,
+            parallel_angle_rand,
+        )
+    }
+
+    /// Fracture polygons using grid slice pattern.
+    ///
+    /// Creates a grid of horizontal and vertical slices.
+    ///
+    /// # Arguments
+    /// * `polygons` - Array of polygons (first = outer boundary, rest = holes)
+    /// * `seed` - Random seed for position/angle variation
+    /// * `grid_h_start` - Starting X position for vertical lines
+    /// * `grid_v_start` - Starting Y position for horizontal lines
+    /// * `grid_h_slices` - Number of vertical slices
+    /// * `grid_v_slices` - Number of horizontal slices
+    /// * `grid_h_random` - Position randomness for vertical lines (0-1)
+    /// * `grid_v_random` - Position randomness for horizontal lines (0-1)
+    /// * `grid_h_angle_rand` - Angle randomness for vertical lines (0-1)
+    /// * `grid_v_angle_rand` - Angle randomness for horizontal lines (0-1)
+    #[func]
+    pub fn fracture_slices_grid(
+        polygons: Array<PackedVector2Array>,
+        seed: i64,
+        grid_h_start: f32,
+        grid_v_start: f32,
+        grid_h_slices: i32,
+        grid_v_slices: i32,
+        grid_h_random: f32,
+        grid_v_random: f32,
+        grid_h_angle_rand: f32,
+        grid_v_angle_rand: f32,
+    ) -> Array<PackedVector2Array> {
+        slice::fracture_slices_grid(
+            &polygons,
+            seed,
+            grid_h_start,
+            grid_v_start,
+            grid_h_slices,
+            grid_v_slices,
+            grid_h_random,
+            grid_v_random,
+            grid_h_angle_rand,
+            grid_v_angle_rand,
+        )
+    }
+
+    /// Fracture polygons using chaotic slice pattern.
+    ///
+    /// Creates random slices across the polygon.
+    ///
+    /// # Arguments
+    /// * `polygons` - Array of polygons (first = outer boundary, rest = holes)
+    /// * `seed` - Random seed for slice generation
+    /// * `slice_count` - Number of random slices
+    #[func]
+    pub fn fracture_slices_chaotic(
+        polygons: Array<PackedVector2Array>,
+        seed: i64,
+        slice_count: i32,
+    ) -> Array<PackedVector2Array> {
+        slice::fracture_slices_chaotic(
+            &polygons,
+            seed,
+            slice_count,
+        )
+    }
+
+    /// Fracture polygons using manually-provided slice segments.
+    ///
+    /// # Arguments
+    /// * `polygons` - Array of polygons (first = outer boundary, rest = holes)
+    /// * `segments` - Slice lines; each element is a 2-point PackedVector2Array [a, b]
+    ///
+    /// # Returns
+    /// Array of polygon fragments
+    #[func]
+    pub fn fracture_slices_manual(
+        polygons: Array<PackedVector2Array>,
+        segments: Array<PackedVector2Array>,
+    ) -> Array<PackedVector2Array> {
+        slice::fracture_slices_manual(&polygons, &segments)
+    }
+
+    /// Optimized parallel slice fracture with projection-bound culling.
+    ///
+    /// Generates parallel segments internally and applies them with spatial
+    /// optimization that skips polygons not intersecting the current cut.
+    ///
+    /// # Arguments
+    /// * `polygons` - Array of polygons (first = outer boundary, rest = holes)
+    /// * `seed` - Random seed for angle variation
+    /// * `slice_count` - Number of parallel slices
+    /// * `parallel_angle` - Base angle in degrees
+    /// * `parallel_angle_rand` - Random angle variation (0-1)
+    #[func]
+    pub fn fracture_slices_parallel_optimized(
+        polygons: Array<PackedVector2Array>,
+        seed: i64,
+        slice_count: i32,
+        parallel_angle: f32,
+        parallel_angle_rand: f32,
+    ) -> Array<PackedVector2Array> {
+        slice::fracture_slices_parallel_optimized(
+            &polygons,
+            seed,
+            slice_count,
+            parallel_angle,
+            parallel_angle_rand,
+        )
+    }
+
     // ========================================================================
     // Seed Generation Methods
     // ========================================================================
