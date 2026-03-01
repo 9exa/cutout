@@ -58,15 +58,14 @@ static func triangulate_with_fallbacks(points: PackedVector2Array) -> PackedInt3
 		return triangles
 	
 
-	# Method 5: Last resort - use convex hull
-	push_warning("[CutoutGeometryUtils] ⚠️ WARNING: Method 5 - Using CONVEX HULL fallback")
-	push_warning("[CutoutGeometryUtils] ⚠️ This will create triangles OUTSIDE the polygon boundary!")
-	
-	var hull := Geometry2D.convex_hull(points)
-	
-	triangles = Geometry2D.triangulate_polygon(hull)
-	
-	return triangles
+	# Method 5: Failed to triangulate - return empty array
+	push_error("[CutoutGeometryUtils] ❌ ERROR: All triangulation methods failed for polygon with %d vertices" % points.size())
+	push_error("[CutoutGeometryUtils] This polygon may be self-intersecting or have collinear points")
+	push_error("[CutoutGeometryUtils] Consider simplifying or validating the polygon before triangulation")
+
+	# Return empty array instead of invalid geometry
+	# Using convex hull would create triangles outside the polygon boundary
+	return PackedInt32Array()
 
 
 ## Proper ear clipping triangulation algorithm for concave polygons.
@@ -349,7 +348,8 @@ static func bisect_polygon(
 	# Case 2: Check if convex (cheap O(n) test with early exit)
 	if is_polygon_convex(outer_polygon):
 		# Fast path: Simple edge intersection algorithm
-		print("[CutoutGeometryUtils] Using fast bisect for convex polygon")
+		# Debug output removed - uncomment for debugging bisection
+		# print("[CutoutGeometryUtils] Using fast bisect for convex polygon")
 		var result := bisect_polygon_simple(outer_polygon, line_start, line_end)
 		return [
 			[result[0]] if result[0].size() >= 3 else [],
@@ -357,7 +357,8 @@ static func bisect_polygon(
 		]
 
 	# Case 3: Concave polygon -> use robust algorithm
-	print("[CutoutGeometryUtils] Using robust bisect for concave polygon")
+	# Debug output removed - uncomment for debugging bisection
+	# print("[CutoutGeometryUtils] Using robust bisect for concave polygon")
 	var result := bisect_polygon_robust(polygons, line_start, line_end)
 	return [result["left"], result["right"]]
 

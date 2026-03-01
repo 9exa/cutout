@@ -72,7 +72,7 @@ pub fn calculate(grid: &Grid) -> Vec<Vec<Vector2>> {
 
     // Largest contours first as they are more likely to be the 'fill', with smaller contours being
     // holes
-    contours.sort_by(|a, b| b.len().cmp(&a.len()));
+    contours.sort_by_key(|b| std::cmp::Reverse(b.len()));
 
     contours
 }
@@ -121,8 +121,10 @@ fn edge_to_point(cx: i32, cy: i32, edge: Edge) -> Vector2i {
 }
 
 fn chain_segments(segments_doubled: Vec<(Vector2i, Vector2i)>) -> Vec<Vec<Vector2>> {
-    let max_iter = segments_doubled.len(); // Prevent infinite loops, should be
-                                           // enough for all segments
+    // Calculate MAX_ITERATIONS based on the number of segments
+    // Each segment can be visited at most twice (once from each direction)
+    // Add a safety margin of 2x for complex topologies
+    let max_iterations = segments_doubled.len() * 4;
 
     // Build a map from points to their connected segments
     // pointkey -> [connected point keys]
@@ -149,9 +151,9 @@ fn chain_segments(segments_doubled: Vec<(Vector2i, Vector2i)>) -> Vec<Vec<Vector
             start_key.1 as f32 / 2.0,
         )];
 
-        // not uncommon for images to be more than 2000k pixels, so don't use recursion or we might
-        // hit stack overflow
-        for _ in 0..max_iter {
+        // Don't use recursion to avoid stack overflow on large images
+        // Iterate up to max_iterations to prevent infinite loops in malformed data
+        for iteration in 0..max_iterations {
             visited.insert(*current_key);
             let Some(neighbours) = adjacency.get(current_key) else {
                 break; // Malformed segments, restart
@@ -163,12 +165,20 @@ fn chain_segments(segments_doubled: Vec<(Vector2i, Vector2i)>) -> Vec<Vec<Vector
                     next_key.1 as f32 / 2.0,
                 ));
                 current_key = next_key;
+
+                // Warn if we're approaching the iteration limit (only once)
+                if iteration == max_iterations - 1 {
+                    godot_warn!("Marching squares: Reached maximum iteration limit ({}) while chaining segments. Contour may be incomplete.", max_iterations);
+                }
             } else {
                 break; // No unvisited neighbours, end of contour
             }
         }
 
         if contour.len() > 2 {
+            // Close the contour by adding the start point at the end
+            let first_point = contour[0];
+            contour.push(first_point);
             contours.push(contour);
         }
     }

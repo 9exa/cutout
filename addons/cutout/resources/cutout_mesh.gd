@@ -58,7 +58,8 @@ var _cached_mesh: ArrayMesh = null
 var _mesh_dirty: bool = true
 var _cached_face_material: StandardMaterial3D = null
 var _cached_side_material: StandardMaterial3D = null
-var _materials_dirty: bool = true
+var _face_material_dirty: bool = true
+var _side_material_dirty: bool = true
 
 
 ## Creates a CutoutMesh from a texture using the full contour extraction pipeline.
@@ -91,25 +92,26 @@ func _invalidate_mesh() -> void:
 func _invalidate_materials() -> void:
 	_cached_face_material = null
 	_cached_side_material = null
-	_materials_dirty = true
+	_face_material_dirty = true
+	_side_material_dirty = true
 	emit_changed()
 
 
 ## Returns the face material (for front/back surfaces), creating it if necessary.
 ## The material is cached and shared across all instances using this CutoutMesh.
 func get_face_material() -> StandardMaterial3D:
-	if _materials_dirty or not _cached_face_material:
+	if _face_material_dirty or not _cached_face_material:
 		_cached_face_material = _create_face_material()
-		_materials_dirty = false
+		_face_material_dirty = false
 	return _cached_face_material
 
 
 ## Returns the side material (for extrusion walls), creating it if necessary.
 ## The material is cached and shared across all instances using this CutoutMesh.
 func get_side_material() -> StandardMaterial3D:
-	if _materials_dirty or not _cached_side_material:
+	if _side_material_dirty or not _cached_side_material:
 		_cached_side_material = _create_side_material()
-		_materials_dirty = false
+		_side_material_dirty = false
 	return _cached_side_material
 
 
@@ -228,7 +230,6 @@ func _generate_3d_mesh(polygon: PackedVector2Array, image: Image) -> ArrayMesh:
 		face_normals.append(Vector3(0, 0, 1))
 
 	# Front face triangles using triangulation
-	# face_indices.append_array(triangles)
 	for i in range(0, triangles.size(), 3):
 		face_indices.append(triangles[i])
 		face_indices.append(triangles[i + 2]) # Reversed. Clockwise

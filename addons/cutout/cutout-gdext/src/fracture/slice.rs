@@ -8,8 +8,9 @@
 //! 3. Handling holes by including them in both halves
 
 use super::geometry::calculate_bounds;
-use clipper2::*;
 use godot::prelude::*;
+
+use super::clipper_utils::{clipper2_difference, clipper2_intersect};
 
 // Segment encoded as a 2-element PackedVector2Array [point_a, point_b].
 type Segment = (Vector2, Vector2);
@@ -173,44 +174,7 @@ fn build_half_plane_rect(
     ]
 }
 
-// ============================================================================
-// Clipper2 helpers (same pattern as voronoi.rs)
-// ============================================================================
-
-fn to_clipper_path(polygon: &[Vector2]) -> Vec<(f64, f64)> {
-    polygon.iter().map(|p| (p.x as f64, p.y as f64)).collect()
-}
-
-fn from_clipper_paths(paths: Paths) -> Vec<Vec<Vector2>> {
-    paths
-        .iter()
-        .map(|path| {
-            path.iter()
-                .map(|p| Vector2::new(p.x() as f32, p.y() as f32))
-                .collect()
-        })
-        .collect()
-}
-
-fn clipper2_intersect(subject: &[Vector2], clip: &[Vector2]) -> Vec<Vec<Vector2>> {
-    let subject_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(subject)];
-    let clip_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(clip)];
-
-    match intersect(subject_paths, clip_paths, FillRule::NonZero) {
-        Ok(result) => from_clipper_paths(result),
-        Err(_) => Vec::new(),
-    }
-}
-
-fn clipper2_difference(subject: &[Vector2], clip: &[Vector2]) -> Vec<Vec<Vector2>> {
-    let subject_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(subject)];
-    let clip_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(clip)];
-
-    match difference(subject_paths, clip_paths, FillRule::NonZero) {
-        Ok(result) => from_clipper_paths(result),
-        Err(_) => vec![subject.to_vec()],
-    }
-}
+// Clipper2 helper functions have been moved to clipper_utils module
 
 fn subtract_all_holes(fragment: &[Vector2], holes: &[Vec<Vector2>]) -> Vec<Vec<Vector2>> {
     let mut remaining = vec![fragment.to_vec()];
@@ -261,7 +225,7 @@ struct SimpleRng {
 impl SimpleRng {
     fn new(seed: i64) -> Self {
         // Match GDScript's seed initialization
-        let mut state = if seed == 0 { 1 } else { seed.abs() as u64 };
+        let mut state = if seed == 0 { 1 } else { seed.unsigned_abs() };
         // Warm up
         for _ in 0..4 {
             state ^= state << 13;
@@ -275,7 +239,7 @@ impl SimpleRng {
         self.state ^= self.state << 13;
         self.state ^= self.state >> 17;
         self.state ^= self.state << 5;
-        (self.state as f32 / u64::MAX as f32)
+        self.state as f32 / u64::MAX as f32
     }
 
     fn randf_range(&mut self, from: f32, to: f32) -> f32 {
@@ -307,6 +271,7 @@ fn bisect_outer(outer: &[Vector2], line_start: Vector2, line_end: Vector2) -> Ve
 }
 
 /// Generate slice segments based on pattern
+#[allow(clippy::too_many_arguments)] // Internal function matching GDExtension API complexity
 fn generate_pattern_segments(
     pattern: SlicePattern,
     outer: &[Vector2],
@@ -479,21 +444,15 @@ fn apply_slices(
     result
 }
 
-/// Fracture polygons using radial pattern
-pub fn fracture_slices_radial(
-    polygons: &Array<PackedVector2Array>,
-    seed: i64,
-    slice_count: i32,
-    origin: Vector2,
-    radial_randomness: f32,
-) -> Array<PackedVector2Array> {
+/// Helper function to extract outer polygon and holes from a polygon array
+fn extract_outer_and_holes(polygons: &Array<PackedVector2Array>) -> Option<(Vec<Vector2>, Vec<Vec<Vector2>>)> {
     if polygons.is_empty() {
-        return Array::new();
+        return None;
     }
 
     let outer: Vec<Vector2> = polygons.get(0).unwrap().to_vec();
     if outer.len() < 3 {
-        return Array::new();
+        return None;
     }
 
     let holes: Vec<Vec<Vector2>> = (1..polygons.len())
@@ -502,6 +461,43 @@ pub fn fracture_slices_radial(
             if h.len() >= 3 { Some(h) } else { None }
         })
         .collect();
+
+    Some((outer, holes))
+}
+
+/// Common pattern for fracture functions - generate segments and apply slices
+fn fracture_with_segments(
+    polygons: &Array<PackedVector2Array>,
+    segments: Vec<(Vector2, Vector2)>
+) -> Array<PackedVector2Array> {
+    let (outer, holes) = match extract_outer_and_holes(polygons) {
+        Some((o, h)) => (o, h),
+        None => return Array::new(),
+    };
+
+    if segments.is_empty() {
+        return polygons.clone();
+    }
+
+    let result = apply_slices(&outer, &holes, &segments);
+    if result.is_empty() {
+        return polygons.clone();
+    }
+    result
+}
+
+/// Fracture polygons using radial pattern
+pub fn fracture_slices_radial(
+    polygons: &Array<PackedVector2Array>,
+    seed: i64,
+    slice_count: i32,
+    origin: Vector2,
+    radial_randomness: f32,
+) -> Array<PackedVector2Array> {
+    let (outer, _) = match extract_outer_and_holes(polygons) {
+        Some((o, h)) => (o, h),
+        None => return Array::new(),
+    };
 
     let mut rng = SimpleRng::new(seed);
     let origin_opt = if origin == Vector2::ZERO { None } else { Some(origin) };
@@ -520,15 +516,7 @@ pub fn fracture_slices_radial(
         0.0, 0.0, // grid angle rand
     );
 
-    if segments.is_empty() {
-        return polygons.clone();
-    }
-
-    let result = apply_slices(&outer, &holes, &segments);
-    if result.is_empty() {
-        return polygons.clone();
-    }
-    result
+    fracture_with_segments(polygons, segments)
 }
 
 /// Fracture polygons using parallel pattern
@@ -539,21 +527,10 @@ pub fn fracture_slices_parallel(
     parallel_angle: f32,
     parallel_angle_rand: f32,
 ) -> Array<PackedVector2Array> {
-    if polygons.is_empty() {
-        return Array::new();
-    }
-
-    let outer: Vec<Vector2> = polygons.get(0).unwrap().to_vec();
-    if outer.len() < 3 {
-        return Array::new();
-    }
-
-    let holes: Vec<Vec<Vector2>> = (1..polygons.len())
-        .filter_map(|i| {
-            let h: Vec<Vector2> = polygons.get(i).unwrap().to_vec();
-            if h.len() >= 3 { Some(h) } else { None }
-        })
-        .collect();
+    let (outer, _) = match extract_outer_and_holes(polygons) {
+        Some((o, h)) => (o, h),
+        None => return Array::new(),
+    };
 
     let mut rng = SimpleRng::new(seed);
 
@@ -572,18 +549,11 @@ pub fn fracture_slices_parallel(
         0.0, 0.0, // grid angle rand
     );
 
-    if segments.is_empty() {
-        return polygons.clone();
-    }
-
-    let result = apply_slices(&outer, &holes, &segments);
-    if result.is_empty() {
-        return polygons.clone();
-    }
-    result
+    fracture_with_segments(polygons, segments)
 }
 
 /// Fracture polygons using grid pattern
+#[allow(clippy::too_many_arguments)] // Called from GDExtension-exposed function
 pub fn fracture_slices_grid(
     polygons: &Array<PackedVector2Array>,
     seed: i64,
@@ -596,21 +566,10 @@ pub fn fracture_slices_grid(
     grid_h_angle_rand: f32,
     grid_v_angle_rand: f32,
 ) -> Array<PackedVector2Array> {
-    if polygons.is_empty() {
-        return Array::new();
-    }
-
-    let outer: Vec<Vector2> = polygons.get(0).unwrap().to_vec();
-    if outer.len() < 3 {
-        return Array::new();
-    }
-
-    let holes: Vec<Vec<Vector2>> = (1..polygons.len())
-        .filter_map(|i| {
-            let h: Vec<Vector2> = polygons.get(i).unwrap().to_vec();
-            if h.len() >= 3 { Some(h) } else { None }
-        })
-        .collect();
+    let (outer, _) = match extract_outer_and_holes(polygons) {
+        Some((o, h)) => (o, h),
+        None => return Array::new(),
+    };
 
     let mut rng = SimpleRng::new(seed);
 
@@ -632,15 +591,7 @@ pub fn fracture_slices_grid(
         grid_v_angle_rand,
     );
 
-    if segments.is_empty() {
-        return polygons.clone();
-    }
-
-    let result = apply_slices(&outer, &holes, &segments);
-    if result.is_empty() {
-        return polygons.clone();
-    }
-    result
+    fracture_with_segments(polygons, segments)
 }
 
 /// Fracture polygons using chaotic pattern
@@ -649,21 +600,10 @@ pub fn fracture_slices_chaotic(
     seed: i64,
     slice_count: i32,
 ) -> Array<PackedVector2Array> {
-    if polygons.is_empty() {
-        return Array::new();
-    }
-
-    let outer: Vec<Vector2> = polygons.get(0).unwrap().to_vec();
-    if outer.len() < 3 {
-        return Array::new();
-    }
-
-    let holes: Vec<Vec<Vector2>> = (1..polygons.len())
-        .filter_map(|i| {
-            let h: Vec<Vector2> = polygons.get(i).unwrap().to_vec();
-            if h.len() >= 3 { Some(h) } else { None }
-        })
-        .collect();
+    let (outer, _) = match extract_outer_and_holes(polygons) {
+        Some((o, h)) => (o, h),
+        None => return Array::new(),
+    };
 
     let mut rng = SimpleRng::new(seed);
 
@@ -681,15 +621,7 @@ pub fn fracture_slices_chaotic(
         0.0, 0.0, // grid angle rand
     );
 
-    if segments.is_empty() {
-        return polygons.clone();
-    }
-
-    let result = apply_slices(&outer, &holes, &segments);
-    if result.is_empty() {
-        return polygons.clone();
-    }
-    result
+    fracture_with_segments(polygons, segments)
 }
 
 /// Fracture polygons using manually provided slice segments
@@ -697,21 +629,9 @@ pub fn fracture_slices_manual(
     polygons: &Array<PackedVector2Array>,
     segments: &Array<PackedVector2Array>,
 ) -> Array<PackedVector2Array> {
-    if polygons.is_empty() || segments.is_empty() {
+    if segments.is_empty() {
         return polygons.clone();
     }
-
-    let outer: Vec<Vector2> = polygons.get(0).unwrap().to_vec();
-    if outer.len() < 3 {
-        return Array::new();
-    }
-
-    let holes: Vec<Vec<Vector2>> = (1..polygons.len())
-        .filter_map(|i| {
-            let h: Vec<Vector2> = polygons.get(i).unwrap().to_vec();
-            if h.len() >= 3 { Some(h) } else { None }
-        })
-        .collect();
 
     // Decode segments from 2-point arrays
     let mut decoded_segments = Vec::new();
@@ -722,15 +642,7 @@ pub fn fracture_slices_manual(
         }
     }
 
-    if decoded_segments.is_empty() {
-        return polygons.clone();
-    }
-
-    let result = apply_slices(&outer, &holes, &decoded_segments);
-    if result.is_empty() {
-        return polygons.clone();
-    }
-    result
+    fracture_with_segments(polygons, decoded_segments)
 }
 
 /// Optimized parallel slice fracture with projection-bound culling

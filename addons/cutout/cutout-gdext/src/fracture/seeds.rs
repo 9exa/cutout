@@ -132,6 +132,7 @@ pub fn generate_grid(
 }
 
 /// Generate radial seed points in concentric rings.
+#[allow(clippy::too_many_arguments)] // Called from GDExtension-exposed function
 pub fn generate_radial(
     polygon: &[Vector2],
     origin: Vector2,
@@ -200,6 +201,7 @@ pub fn generate_radial(
 }
 
 /// Generate spiderweb seed points (radial rays + concentric rings).
+#[allow(clippy::too_many_arguments)] // Called from GDExtension-exposed function
 pub fn generate_spiderweb(
     polygon: &[Vector2],
     origin: Vector2,

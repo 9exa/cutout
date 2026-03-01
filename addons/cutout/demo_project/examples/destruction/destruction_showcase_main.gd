@@ -8,7 +8,6 @@ const PlayerController = preload("res://addons/cutout/demo_project/examples/dest
 const InteractionSystem = preload("res://addons/cutout/demo_project/examples/destruction/interaction_system.gd")
 const DestructibleCutout = preload("res://addons/cutout/demo_project/examples/destruction/destructible_cutout.gd")
 const CutoutDestructionVoronoi = preload("res://addons/cutout/resources/destruction/cutout_destruction_voronoi.gd")
-const CutoutDestructionSlice = preload("res://addons/cutout/resources/destruction/cutout_destruction_slice.gd")
 const CutoutDestructionSlices = preload("res://addons/cutout/resources/destruction/cutout_destruction_slices.gd")
 const CutoutMesh = preload("res://addons/cutout/resources/cutout_mesh.gd")
 const CutoutMeshInstance3D = preload("res://addons/cutout/nodes/cutout_mesh_instance_3d.gd")
@@ -426,19 +425,22 @@ func get_algorithm_name(algorithm: CutoutDestructionAlgorithm) -> String:
 				return "Voronoi: Poisson Disk"
 			_:
 				return "Voronoi: Unknown"
-	elif algorithm is CutoutDestructionSlice:
-		return "Slice"
 	elif algorithm is CutoutDestructionSlices:
 		var slices := algorithm as CutoutDestructionSlices
-		match slices.pattern:
-			CutoutDestructionSlices.Pattern.PARALLEL:
-				return "Slices: Parallel"
-			CutoutDestructionSlices.Pattern.RADIAL:
-				return "Slices: Radial"
-			CutoutDestructionSlices.Pattern.GRID:
-				return "Slices: Grid"
-			_:
-				return "Slices: Unknown"
+		if slices.mode == CutoutDestructionSlices.SliceMode.SINGLE:
+			return "Slice: Single"
+		elif slices.mode == CutoutDestructionSlices.SliceMode.PATTERN:
+			match slices.pattern:
+				CutoutDestructionSlices.Pattern.PARALLEL:
+					return "Slices: Parallel"
+				CutoutDestructionSlices.Pattern.RADIAL:
+					return "Slices: Radial"
+				CutoutDestructionSlices.Pattern.GRID:
+					return "Slices: Grid"
+				_:
+					return "Slices: Chaotic"
+		else:  # MANUAL mode
+			return "Slices: Manual"
 	else:
 		# Generic fallback - use the class name
 		return algorithm.get_class().replace("CutoutDestruction", "")

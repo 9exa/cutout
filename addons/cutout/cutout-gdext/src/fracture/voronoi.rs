@@ -10,8 +10,8 @@
 //! 4. Clipping cells to the outer polygon (via `clipper2` intersect)
 //! 5. Subtracting holes from fragments (via `clipper2` difference)
 
+use super::clipper_utils::{clipper2_difference, clipper2_intersect};
 use super::geometry::{calculate_bounds, clip_polygon_to_half_plane};
-use clipper2::*;
 use godot::prelude::*;
 
 /// Fracture polygons into Voronoi-based fragments.
@@ -41,7 +41,7 @@ pub fn fracture(
     // Step 1: Delaunay triangulation
     let triangulation = delaunay(&seeds);
     let Some(triangulation) = triangulation else {
-        godot_warn!("Voronoi fracture: Delaunay triangulation failed");
+        godot_error!("Voronoi fracture: Delaunay triangulation failed with {} seed points. Seeds may be collinear or too close together.", seeds.len());
         return polygons.clone();
     };
 
@@ -94,7 +94,7 @@ pub fn fracture(
     }
 
     if fragments.is_empty() {
-        godot_warn!("Voronoi fracture: No valid fragments generated, returning original");
+        godot_error!("Voronoi fracture: No valid fragments generated from {} cells and {} seed points. Polygon may be too small or seeds outside bounds.", voronoi_cells.len(), seeds.len());
         return polygons.clone();
     }
 
@@ -196,48 +196,7 @@ fn compute_voronoi_cells(
     cells
 }
 
-// ============================================================================
-// Clipper2 integration
-// ============================================================================
-
-/// Convert Vec<Vector2> (f32) to a clipper2-compatible path of (f64, f64) tuples.
-fn to_clipper_path(polygon: &[Vector2]) -> Vec<(f64, f64)> {
-    polygon.iter().map(|p| (p.x as f64, p.y as f64)).collect()
-}
-
-/// Convert clipper2 result Paths back to Vec<Vec<Vector2>>.
-fn from_clipper_paths(paths: Paths) -> Vec<Vec<Vector2>> {
-    paths
-        .iter()
-        .map(|path| {
-            path.iter()
-                .map(|p| Vector2::new(p.x() as f32, p.y() as f32))
-                .collect()
-        })
-        .collect()
-}
-
-/// Intersect two polygons using clipper2.
-fn clipper2_intersect(subject: &[Vector2], clip: &[Vector2]) -> Vec<Vec<Vector2>> {
-    let subject_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(subject)];
-    let clip_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(clip)];
-
-    match intersect(subject_paths, clip_paths, FillRule::NonZero) {
-        Ok(result) => from_clipper_paths(result),
-        Err(_) => Vec::new(),
-    }
-}
-
-/// Subtract a polygon (hole) from a subject polygon using clipper2.
-fn clipper2_difference(subject: &[Vector2], clip: &[Vector2]) -> Vec<Vec<Vector2>> {
-    let subject_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(subject)];
-    let clip_paths: Vec<Vec<(f64, f64)>> = vec![to_clipper_path(clip)];
-
-    match difference(subject_paths, clip_paths, FillRule::NonZero) {
-        Ok(result) => from_clipper_paths(result),
-        Err(_) => vec![subject.to_vec()], // On error, return original
-    }
-}
+// Clipper2 helper functions have been moved to clipper_utils module
 
 /// Subtract all holes from a fragment, with spatial culling.
 fn subtract_holes(

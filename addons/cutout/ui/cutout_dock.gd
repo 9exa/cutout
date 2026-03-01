@@ -970,10 +970,25 @@ func _drop_data(_position: Vector2, data):
 			_load_image(files[0])
 
 func _resolve_self_intersections(polygon: PackedVector2Array) -> PackedVector2Array:
-	# Use Godot's Geometry2D to merge polygons and resolve self-intersections
-	var merged_polygons = Geometry2D.merge_polygons(polygon, polygon)
-	if merged_polygons.size() > 0:
-		return merged_polygons[0]
+	# Use Godot's offset_polygon with zero offset to clean up self-intersections
+	# This forces the Clipper library to resolve any self-intersections
+	var cleaned_polygons = Geometry2D.offset_polygon(polygon, 0.0, Geometry2D.JOIN_MITER)
+
+	# If cleanup succeeded, return the cleaned polygon
+	if cleaned_polygons.size() > 0:
+		# Take the largest polygon if multiple were created
+		var largest_polygon = cleaned_polygons[0]
+		var largest_area = abs(Geometry2D.triangulate_polygon(largest_polygon).size())
+
+		for i in range(1, cleaned_polygons.size()):
+			var area = abs(Geometry2D.triangulate_polygon(cleaned_polygons[i]).size())
+			if area > largest_area:
+				largest_area = area
+				largest_polygon = cleaned_polygons[i]
+
+		return largest_polygon
+
+	# Fallback: return original polygon if cleaning failed
 	return polygon
 
 

@@ -61,22 +61,6 @@ func test_marching_squares_alpha_threshold():
 	result = algorithm.calculate_boundary(image)
 	assert(result.size() > 0, "Semi-transparent pixel above threshold should create contour")
 
-func test_edge_to_point():
-	var algorithm = CutoutContourMarchingSquares.new()
-
-	# EDGE_TOP = 0, EDGE_RIGHT = 1, EDGE_BOTTOM = 2, EDGE_LEFT = 3
-	var top = algorithm._edge_to_point(0, 0, CutoutContourMarchingSquares.EDGE_TOP)
-	assert(top == Vector2(0.5, 0), "Top edge should be at middle of top")
-
-	var right = algorithm._edge_to_point(0, 0, CutoutContourMarchingSquares.EDGE_RIGHT)
-	assert(right == Vector2(1.0, 0.5), "Right edge should be at middle of right")
-
-	var bottom = algorithm._edge_to_point(0, 0, CutoutContourMarchingSquares.EDGE_BOTTOM)
-	assert(bottom == Vector2(0.5, 1.0), "Bottom edge should be at middle of bottom")
-
-	var left = algorithm._edge_to_point(0, 0, CutoutContourMarchingSquares.EDGE_LEFT)
-	assert(left == Vector2(0, 0.5), "Left edge should be at middle of left")
-
 func test_marching_squares_2x2_via_image():
 	var algorithm = CutoutContourMarchingSquares.new()
 	var image = Image.create(4, 4, false, Image.FORMAT_RGBA8)

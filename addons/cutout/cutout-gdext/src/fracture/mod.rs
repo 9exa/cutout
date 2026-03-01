@@ -6,6 +6,7 @@
 //! - Slice fracturing - Cut polygons along lines
 //! - Seed generation - 5 distribution patterns for Voronoi cell placement
 
+pub mod clipper_utils;
 pub mod geometry;
 pub mod processor;
 pub mod seeds;

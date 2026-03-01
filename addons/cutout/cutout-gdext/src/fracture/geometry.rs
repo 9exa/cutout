@@ -62,18 +62,15 @@ pub fn point_in_polygon(point: Vector2, polygon: &[Vector2]) -> bool {
     for i in 1..=n {
         let p2 = polygon[i % n];
 
-        if point.y > p1.y.min(p2.y) {
-            if point.y <= p1.y.max(p2.y) {
-                if point.x <= p1.x.max(p2.x) {
-                    if p1.y != p2.y {
+        if point.y > p1.y.min(p2.y)
+            && point.y <= p1.y.max(p2.y)
+                && point.x <= p1.x.max(p2.x)
+                    && p1.y != p2.y {
                         let xinters = (point.y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y) + p1.x;
                         if p1.x == p2.x || point.x <= xinters {
                             inside = !inside;
                         }
                     }
-                }
-            }
-        }
 
         p1 = p2;
     }

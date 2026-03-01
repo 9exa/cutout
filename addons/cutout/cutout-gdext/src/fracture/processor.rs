@@ -127,6 +127,7 @@ impl CutoutDestructionProcessor {
     /// * `grid_h_angle_rand` - Angle randomness for vertical lines (0-1)
     /// * `grid_v_angle_rand` - Angle randomness for horizontal lines (0-1)
     #[func]
+    #[allow(clippy::too_many_arguments)] // GDExtension limitation - can't use structs
     pub fn fracture_slices_grid(
         polygons: Array<PackedVector2Array>,
         seed: i64,
@@ -260,6 +261,7 @@ impl CutoutDestructionProcessor {
     ///
     /// Creates impact/explosion patterns.
     #[func]
+    #[allow(clippy::too_many_arguments)] // GDExtension limitation - can't use structs
     pub fn generate_radial_seeds(
         polygon: PackedVector2Array,
         origin: Vector2,
@@ -282,6 +284,7 @@ impl CutoutDestructionProcessor {
     ///
     /// Creates cracked glass patterns.
     #[func]
+    #[allow(clippy::too_many_arguments)] // GDExtension limitation - can't use structs
     pub fn generate_spiderweb_seeds(
         polygon: PackedVector2Array,
         origin: Vector2,
