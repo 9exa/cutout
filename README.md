@@ -19,14 +19,21 @@ A powerful Godot plugin that creates extruded 3D meshes from 2D textures using a
 ## 📦 Installation
 
 ### From Godot Asset Library
+
 1. Open Godot Editor → AssetLib
 2. Search for "Cutout"
 3. Download and install
 4. Enable plugin in Project Settings → Plugins
 
 ### Manual Installation
+
+#### Requirements
+
+This addon has components written in Rust. To build it, you need to make sure that you have installed [the Rust toolchain](https://www.rust-lang.org/tools/install) and [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html).
+
 1. Download the latest release from [GitHub Releases](https://github.com/yourusername/cutout_plugin/releases)
 2. Extract to your project's `addons/` folder
+3. Build the GDExtension component by going into `addons/cutout/gdextension/` and running `cargo build --release`
 3. Enable plugin in Project Settings → Plugins
 
 ## 🚀 Quick Start
@@ -46,6 +53,7 @@ A powerful Godot plugin that creates extruded 3D meshes from 2D textures using a
    - Click "Export" to save as `.tres` resource
 
 4. **Use in Your Scene**
+
    ```gdscript
    # Add a CutoutMeshInstance3D node
    var cutout = CutoutMeshInstance3D.new()
@@ -115,12 +123,14 @@ cutout_plugin/
 ## 🔧 Development
 
 ### Running Tests
+
 ```bash
 # Unit tests are in demo_project/tests/
 # Open test scenes in Godot editor to run
 ```
 
 ### Exporting for Asset Library
+
 ```bash
 # Creates a clean ZIP with only plugin files
 ./export_plugin.sh 1.0.0
@@ -135,6 +145,7 @@ cutout_plugin/
 4. The plugin will auto-discover it via `CutoutAlgorithmRegistry`
 
 Example:
+
 ```gdscript
 @tool
 class_name CutoutContourMyAlgorithm
@@ -152,6 +163,7 @@ func _calculate_boundary(image: Image) -> Array[PackedVector2Array]:
 ## 🤝 Contributing
 
 Contributions are welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Add tests for new features
@@ -166,6 +178,7 @@ MIT License - See [LICENSE](LICENSE) for details
 Created by [Your Name]
 
 ### Special Thanks
+
 - Godot Engine community
 - Algorithm implementations based on academic papers (see code comments)
 
